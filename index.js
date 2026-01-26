@@ -1,9 +1,8 @@
 const express = require("express");
-
 const app = express();
 
 app.get("/", (req, res) => {
-  res.send("OK FROM RAILWAY");
+  res.send("RAILWAY OK");
 });
 
 const PORT = process.env.PORT;
