@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kiri AI Widget</title>
+
+<style>
+:root {
+  --glass: rgba(15, 15, 15, 0.75);
+  --border: rgba(255,255,255,0.08);
+  --text: #ffffff;
+  --muted: #ffffff; /* CHANGED: AI text now white */
+}
+
+body {
+  margin: 0;
+  background: #000;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+/* FLOATING BUTTON */
+#kiri-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 58px;
+  height: 58px;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 20px 40px rgba(0,0,0,.7);
+  z-index: 9999;
+}
+
+/* WIDGET */
+#kiri-widget {
+  position: fixed;
+  bottom: 100px;
+  right: 24px;
+  width: 360px;
+  height: 520px;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: 0 30px 70px rgba(0,0,0,.9);
+  display: none;
+  flex-direction: column;
+  z-index: 9999;
+}
+
+@media (max-width: 480px) {
+  #kiri-widget {
+    width: 92vw;
+    height: 80vh;
+    right: 4vw;
+    bottom: 90px;
+  }
+}
+
+/* HEADER */
+#header {
+  padding: 16px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border-bottom: 1px solid var(--border);
+  color: #ffffff;
+}
+
+/* MESSAGES */
+#messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.msg {
+  max-width: 80%;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* USER MESSAGE */
+.user {
+  margin-left: auto;
+  background: rgba(255,255,255,0.12);
+  color: #ffffff; /* CONFIRMED WHITE */
+}
+
+/* AI MESSAGE */
+.bot {
+  margin-right: auto;
+  background: rgba(255,255,255,0.06);
+  color: #ffffff; /* FIXED: AI now white */
+}
+
+/* INPUT */
+#inputBar {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+#input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #fff;
+  outline: none;
+}
+
+button {
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 16px;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* TYPING */
+.typing span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  background: #fff; /* typing dots now white */
+  border-radius: 50%;
+  animation: blink 1.4s infinite both;
+}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+
+@keyframes blink {
+  0%{opacity:.2}
+  20%{opacity:1}
+  100%{opacity:.2}
+}
+</style>
+</head>
+
+<body>
+
+<button id="kiri-btn" onclick="toggle()">K</button>
+
+<div id="kiri-widget">
+  <div id="header">KIRI AI</div>
+
+  <div id="messages">
+    <div class="msg bot">Hello. How can I help you?</div>
+  </div>
+
+  <div id="inputBar">
+    <input id="input" placeholder="Type your message…" onkeydown="if(event.key==='Enter') send()">
+    <button onclick="send()">Send</button>
+  </div>
+</div>
+
+<script>
+const KIRI_API = "http://localhost:3000";
+function toggle() {
+  const w = document.getElementById("kiri-widget");
+  w.style.display = w.style.display === "flex" ? "none" : "flex";
+}
+
+async function send() {
+  const input = document.getElementById("input");
+  const messages = document.getElementById("messages");
+  const text = input.value.trim();
+  if (!text) return;
+
+  messages.innerHTML += `<div class="msg user">${text}</div>`;
+  input.value = "";
+  messages.scrollTop = messages.scrollHeight;
+
+  const typing = document.createElement("div");
+  typing.className = "msg bot";
+  typing.innerHTML = `<div class="typing"><span></span><span></span><span></span></div>`;
+  messages.appendChild(typing);
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const res = await fetch("https://kiri-backend-production.up.railway.app/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    messages.removeChild(typing);
+    messages.innerHTML += `<div class="msg bot">${data.reply}</div>`;
+    messages.scrollTop = messages.scrollHeight;
+  } catch {
+    messages.removeChild(typing);
+    messages.innerHTML += `<div class="msg bot">Error.</div>`;
+  }
+}
+</script>
+
+</body>
+</html>
+
+
+
