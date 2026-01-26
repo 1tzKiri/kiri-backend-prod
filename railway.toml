@@ -3,6 +3,4 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "node index.js"
-
-[phases.install]
-cmds = ["npm install"]
+healthcheckPath = "/"
