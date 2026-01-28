@@ -168,7 +168,8 @@ button {
 </div>
 
 <script>
-const KIRI_API = "http://localhost:3000";
+const KIRI_API = "";
+
 function toggle() {
   const w = document.getElementById("kiri-widget");
   w.style.display = w.style.display === "flex" ? "none" : "flex";
@@ -191,20 +192,29 @@ async function send() {
   messages.scrollTop = messages.scrollHeight;
 
   try {
-    const res = await fetch("https://kiri-backend-production.up.railway.app/ask", {
+    const res = await fetch(`${KIRI_API}/ask`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text })
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: text
+      })
     });
+
     const data = await res.json();
+
     messages.removeChild(typing);
     messages.innerHTML += `<div class="msg bot">${data.reply}</div>`;
     messages.scrollTop = messages.scrollHeight;
-  } catch {
+
+  } catch (err) {
     messages.removeChild(typing);
     messages.innerHTML += `<div class="msg bot">Error.</div>`;
+    console.error(err);
   }
 }
+
 </script>
 
 </body>
