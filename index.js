@@ -11,6 +11,7 @@ app.set("trust proxy", true);
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.static(__dirname));
 
 // OpenAI client
 const client = new OpenAI({
@@ -19,9 +20,9 @@ const client = new OpenAI({
 
 // SERVE UI AT ROOT
 app.get("/", (req, res) => {
-  res.set("Content-Type", "text/plain");
-  res.send("OK");
+  res.sendFile(path.join(__dirname, "chat.html"));
 });
+
 
 // Chat endpoint
 app.post("/ask", async (req, res) => {
