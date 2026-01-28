@@ -6,11 +6,10 @@ const { OpenAI } = require("openai");
 
 const app = express();
 app.use(cors());
-const port = 3000;
+
 
 // Middleware
 app.use(express.json());
-app.use(express.static(__dirname));
 
 // OpenAI client
 const client = new OpenAI({
@@ -19,7 +18,7 @@ const client = new OpenAI({
 
 // SERVE UI AT ROOT
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "chat.html"));
+  res.status(200).send("Kiri backend is alive");
 });
 
 // Chat endpoint
