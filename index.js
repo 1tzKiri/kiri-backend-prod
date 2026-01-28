@@ -1,32 +1,31 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const { OpenAI } = require("openai");
 
 const app = express();
-
-/* ===== middleware ===== */
 app.use(cors());
+const port = 3000;
+
+// Middleware
 app.use(express.json());
+app.use(express.static(__dirname));
 
-/* ===== OpenAI client ===== */
+// OpenAI client
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-/* ===== health check (IMPORTANT for Railway) ===== */
+// SERVE UI AT ROOT
 app.get("/", (req, res) => {
-  res.status(200).send("Kiri backend is alive");
+  res.sendFile(path.join(__dirname, "chat.html"));
 });
 
-/* ===== chat endpoint ===== */
+// Chat endpoint
 app.post("/ask", async (req, res) => {
   try {
     const userMessage = req.body.message;
-
-    if (!userMessage) {
-      return res.status(400).json({ reply: "No message provided" });
-    }
 
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
@@ -50,13 +49,13 @@ app.post("/ask", async (req, res) => {
 
     res.json({ reply });
   } catch (error) {
-    console.error("AI error:", error);
+    console.error(error);
     res.status(500).json({ reply: "AI error occurred." });
   }
 });
 
-/* ===== start server (Railway REQUIRED) ===== */
+// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Kiri backend running on port", PORT);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Kiri backend running on port " + PORT);
 });
