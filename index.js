@@ -5,10 +5,11 @@ const path = require("path");
 const { OpenAI } = require("openai");
 
 const app = express();
-app.use(cors());
+app.set("trust proxy", true);
 
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 
 // OpenAI client
@@ -18,7 +19,8 @@ const client = new OpenAI({
 
 // SERVE UI AT ROOT
 app.get("/", (req, res) => {
-  res.status(200).send("Kiri backend is alive");
+  res.set("Content-Type", "text/plain");
+  res.send("OK");
 });
 
 // Chat endpoint
@@ -53,8 +55,13 @@ app.post("/ask", async (req, res) => {
   }
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
+
+if (!PORT) {
+  console.error("PORT is missing");
+  process.exit(1);
+}
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Kiri backend running on port " + PORT);
 });
