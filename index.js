@@ -57,11 +57,6 @@ app.post("/ask", async (req, res) => {
 
 const PORT = process.env.PORT;
 
-if (!PORT) {
-  console.error("PORT is missing");
-  process.exit(1);
-}
-
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Kiri backend running on port " + PORT);
 });
