@@ -67,15 +67,6 @@ await pool.query(
   }
 });
 
-app.get("/db-check", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({ ok: true, time: result.rows[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ ok: false });
-  }
-});
 
 const PORT = process.env.PORT;
 
