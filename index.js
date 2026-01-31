@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const { OpenAI } = require("openai");
+const pool = require("./db");
 
 const app = express();
 app.set("trust proxy", true);
@@ -29,6 +30,11 @@ app.post("/ask", async (req, res) => {
   try {
     const userMessage = req.body.message;
 
+await pool.query(
+  "INSERT INTO messages (role, content) VALUES ($1, $2)",
+  ["user", userMessage]
+);
+
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
       input: [
@@ -48,6 +54,11 @@ app.post("/ask", async (req, res) => {
       response.output_text ||
       response.output?.[0]?.content?.[0]?.text ||
       "No response";
+
+await pool.query(
+  "INSERT INTO messages (role, content) VALUES ($1, $2)",
+  ["assistant", reply]
+);
 
     res.json({ reply });
   } catch (error) {
