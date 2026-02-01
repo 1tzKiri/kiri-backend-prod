@@ -72,14 +72,14 @@ await pool.query(
 );
 
 
-    res.json({ reply });
+    res.json({ reply, conversationId: convoId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ reply: "AI error occurred." });
   }
 });
 
-res.json({ reply, conversationId: convoId });
+
 
 
 const PORT = process.env.PORT;
