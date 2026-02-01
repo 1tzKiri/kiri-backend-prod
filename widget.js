@@ -1,3 +1,5 @@
+let conversationId = localStorage.getItem("conversationId");
+
 (function () {
   if (document.getElementById("kiri-widget")) return;
 

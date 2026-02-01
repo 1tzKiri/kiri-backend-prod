@@ -197,12 +197,19 @@ async function send() {
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        message: text
-      })
+    body: JSON.stringify({
+  message: text,
+  conversationId
+})
+
     });
 
     const data = await res.json();
+if (data.conversationId) {
+  conversationId = data.conversationId;
+  localStorage.setItem("conversationId", conversationId);
+}
+
 
     messages.removeChild(typing);
     messages.innerHTML += `<div class="msg bot">${data.reply}</div>`;

@@ -28,12 +28,17 @@ app.get("/", (req, res) => {
 // Chat endpoint
 app.post("/ask", async (req, res) => {
   try {
-    const userMessage = req.body.message;
+  
+  const { message, conversationId } = req.body;
 
-const conversationResult = await pool.query(
-  "INSERT INTO conversations DEFAULT VALUES RETURNING id"
-);
-const conversationId = conversationResult.rows[0].id;
+let convoId = conversationId;
+
+if (!convoId) {
+  const convo = await pool.query(
+    "INSERT INTO conversations DEFAULT VALUES RETURNING id"
+  );
+  convoId = convo.rows[0].id;
+}
 
 await pool.query(
   "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
@@ -73,6 +78,8 @@ await pool.query(
     res.status(500).json({ reply: "AI error occurred." });
   }
 });
+
+res.json({ reply, conversationId: convoId });
 
 
 const PORT = process.env.PORT;
