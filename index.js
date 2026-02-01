@@ -30,10 +30,16 @@ app.post("/ask", async (req, res) => {
   try {
     const userMessage = req.body.message;
 
-await pool.query(
-  "INSERT INTO messages (role, content) VALUES ($1, $2)",
-  ["user", userMessage]
+const conversationResult = await pool.query(
+  "INSERT INTO conversations DEFAULT VALUES RETURNING id"
 );
+const conversationId = conversationResult.rows[0].id;
+
+await pool.query(
+  "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
+  [conversationId, "user", userMessage]
+);
+
 
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
@@ -56,9 +62,10 @@ await pool.query(
       "No response";
 
 await pool.query(
-  "INSERT INTO messages (role, content) VALUES ($1, $2)",
-  ["assistant", reply]
+  "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
+  [conversationId, "assistant", reply]
 );
+
 
     res.json({ reply });
   } catch (error) {
