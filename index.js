@@ -78,19 +78,17 @@ messagesForAI.unshift({
       response.output?.[0]?.content?.[0]?.text ||
       "No response";
 
+// after assistant reply is saved
+
 await pool.query(
   "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-  [conversationId, "assistant", reply]
+  [convoId, "assistant", reply]
 );
 
-
-    res.json({ reply, conversationId: convoId });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ reply: "AI error occurred." });
-  }
+res.json({
+  reply,
+  conversationId: convoId
 });
-
 
 
 
