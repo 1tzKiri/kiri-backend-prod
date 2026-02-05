@@ -48,71 +48,68 @@ app.get("/", (req, res) => {
 
 // Chat endpoint
 app.post("/ask", askLimiter, async (req, res) => {
-   try {
+  try {
+    if (!req.body || !req.body.message) {
+      return res.status(400).json({ error: "Missing message" });
+    }
 
- if (!req.body || !req.body.message) {
-  return res.status(400).json({ error: "Missing message" });
-}
+    const { message, conversationId } = req.body;
+    let convoId = conversationId || null;
 
- const { message, conversationId } = req.body;
-let convoId = conversationId || null;
+    if (!convoId) {
+      const convo = await pool.query(
+        "INSERT INTO conversations DEFAULT VALUES RETURNING id"
+      );
+      convoId = convo.rows[0].id;
+    }
 
+    await pool.query(
+      "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
+      [convoId, "user", message]
+    );
 
-if (!convoId) {
-  const convo = await pool.query(
-    "INSERT INTO conversations DEFAULT VALUES RETURNING id"
-  );
-  convoId = convo.rows[0].id;
-}
+    const historyResult = await pool.query(
+      `
+      SELECT role, content
+      FROM messages
+      WHERE conversation_id = $1
+      ORDER BY created_at ASC
+      LIMIT 10
+      `,
+      [convoId]
+    );
 
-await pool.query(
-  "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-  [convoId, "user", message]
-);
+    const messagesForAI = historyResult.rows.map(m => ({
+      role: m.role,
+      content: m.content
+    }));
 
-const historyResult = await pool.query(
-  `
-  SELECT role, content
-  FROM messages
-  WHERE conversation_id = $1
-  ORDER BY created_at ASC
-  LIMIT 10
-  `,
-  [convoId]
-);
+    messagesForAI.unshift({
+      role: "system",
+      content: "You are a professional customer support assistant. Be clear and helpful."
+    });
 
+    const response = await client.responses.create({
+      model: "gpt-4.1-mini",
+      input: messagesForAI
+    });
 
-const messagesForAI = historyResult.rows.map(m => ({
-  role: m.role,
-  content: m.content
-}));
+    const reply =
+      response.output_text ||
+      response.output?.[0]?.content?.[0]?.text ||
+      "No response";
 
-messagesForAI.unshift({
-  role: "system",
-  content: "You are a professional customer support assistant. Be clear and helpful."
-});
+    await pool.query(
+      "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
+      [convoId, "assistant", reply]
+    );
 
-const response = await client.responses.create({
-  model: "gpt-4.1-mini",
-  input: messagesForAI
-});
+    res.json({ reply, conversationId: convoId });
 
-const reply =
-  response.output_text ||
-  response.output?.[0]?.content?.[0]?.text ||
-  "No response";
-
-await pool.query(
-  "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-  [convoId, "assistant", reply]
-);
-
-res.json({ reply, conversationId: convoId });
-
-} catch (err) {
-  console.error("ASK ERROR:", err);
-  res.status(500).json({ error: "Internal server error" });
-}
+  } catch (err) {
+    console.error("ASK ERROR:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 
