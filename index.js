@@ -42,7 +42,7 @@ if (!convoId) {
 
 await pool.query(
   "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-  [conversationId, "user", userMessage]
+  [conversationId, "user", message]
 );
 
 const historyResult = await pool.query(
