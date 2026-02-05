@@ -4,15 +4,36 @@ const cors = require("cors");
 const path = require("path");
 const { OpenAI } = require("openai");
 const pool = require("./db");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 app.set("trust proxy", true);
 
 
 // Middleware
-app.use(cors());
+const ALLOWED_ORIGINS = [
+  "https://your-site.com",
+  "http://localhost:3000"
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  }
+}));
 app.use(express.json());
 app.use(express.static(__dirname));
+
+const askLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // 20 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // OpenAI client
 const client = new OpenAI({
@@ -26,7 +47,7 @@ app.get("/", (req, res) => {
 
 
 // Chat endpoint
-app.post("/ask", async (req, res) => {
+app.post("/ask", askLimiter, async (req, res) => {
   try {
   
   const { message, conversationId } = req.body;
