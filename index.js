@@ -114,11 +114,9 @@ await pool.query(
 } catch (err) {
   console.error("ASK ERROR:", err);
 
-  res.status(500).json({
-    error: "Internal server error"
-  });
+  res.status(500).json({error: "Internal server error" });
 }
-
+});
 
 const PORT = process.env.PORT;
 
