@@ -48,6 +48,7 @@ app.get("/", (req, res) => {
 
 // Chat endpoint
 app.post("/ask", askLimiter, async (req, res) => {
+   try {
 
  if (!req.body || !req.body.message) {
   return res.status(400).json({ error: "Missing message" });
