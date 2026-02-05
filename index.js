@@ -42,7 +42,7 @@ if (!convoId) {
 
 await pool.query(
   "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-  [conversationId, "user", message]
+  [convoId, "user", message]
 );
 
 const historyResult = await pool.query(
@@ -57,12 +57,7 @@ const historyResult = await pool.query(
 );
 
 
-   const response = await client.responses.create({
-  model: "gpt-4.1-mini",
-  input: messagesForAI
-});
-
-   const messagesForAI = historyResult.rows.map(m => ({
+const messagesForAI = historyResult.rows.map(m => ({
   role: m.role,
   content: m.content
 }));
@@ -71,6 +66,12 @@ messagesForAI.unshift({
   role: "system",
   content: "You are a professional customer support assistant. Be clear and helpful."
 });
+
+const response = await client.responses.create({
+  model: "gpt-4.1-mini",
+  input: messagesForAI
+});
+
 
 
     const reply =
