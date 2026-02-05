@@ -96,27 +96,24 @@ const response = await client.responses.create({
   input: messagesForAI
 });
 
-
-
-    const reply =
-      response.output_text ||
-      response.output?.[0]?.content?.[0]?.text ||
-      "No response";
-
-// after assistant reply is saved
+const reply =
+  response.output_text ||
+  response.output?.[0]?.content?.[0]?.text ||
+  "No response";
 
 await pool.query(
   "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
   [convoId, "assistant", reply]
 );
 
-    res.json({ reply, conversationId: convoId });
+res.json({ reply, conversationId: convoId });
+
 } catch (err) {
   console.error("ASK ERROR:", err);
-
-  res.status(500).json({error: "Internal server error" });
+  res.status(500).json({ error: "Internal server error" });
 }
 });
+
 
 const PORT = process.env.PORT;
 
