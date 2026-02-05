@@ -48,11 +48,14 @@ app.get("/", (req, res) => {
 
 // Chat endpoint
 app.post("/ask", askLimiter, async (req, res) => {
-  try {
-  
-  const { message, conversationId } = req.body;
 
-let convoId = conversationId;
+ if (!req.body || !req.body.message) {
+  return res.status(400).json({ error: "Missing message" });
+}
+
+ const { message, conversationId } = req.body;
+let convoId = conversationId || null;
+
 
 if (!convoId) {
   const convo = await pool.query(
@@ -108,11 +111,14 @@ await pool.query(
 );
 
     res.json({ reply, conversationId: convoId });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ reply: "AI error occurred." });
-  }
-});
+} catch (err) {
+  console.error("ASK ERROR:", err);
+
+  res.status(500).json({
+    error: "Internal server error"
+  });
+}
+
 
 const PORT = process.env.PORT;
 
