@@ -85,15 +85,17 @@ await pool.query(
   [convoId, "assistant", reply]
 );
 
-res.json({
-  reply,
-  conversationId: convoId
+    res.json({ reply, conversationId: convoId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ reply: "AI error occurred." });
+  }
 });
-
-
 
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Kiri backend running on port " + PORT);
 });
+
+
