@@ -45,21 +45,33 @@ await pool.query(
   [conversationId, "user", userMessage]
 );
 
+const historyResult = await pool.query(
+  `
+  SELECT role, content
+  FROM messages
+  WHERE conversation_id = $1
+  ORDER BY created_at ASC
+  LIMIT 10
+  `,
+  [convoId]
+);
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: [
-        {
-          role: "system",
-          content:
-            "You are a professional customer support assistant for a modern business. Be polite, clear, and concise."
-        },
-        {
-          role: "user",
-          content: userMessage
-        }
-      ]
-    });
+
+   const response = await client.responses.create({
+  model: "gpt-4.1-mini",
+  input: messagesForAI
+});
+
+   const messagesForAI = historyResult.rows.map(m => ({
+  role: m.role,
+  content: m.content
+}));
+
+messagesForAI.unshift({
+  role: "system",
+  content: "You are a professional customer support assistant. Be clear and helpful."
+});
+
 
     const reply =
       response.output_text ||
