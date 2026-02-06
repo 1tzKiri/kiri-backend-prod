@@ -13,14 +13,10 @@ app.set("trust proxy", true);
 // Middleware
 
 app.use(cors({
-  origin: [
-    "https://kiri-backend-prod-production.up.railway.app",
-    "http://localhost:3000"
-  ],
+  origin: "*",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"]
 }));
-
 
 app.use(express.json());
 app.use(express.static(__dirname));
