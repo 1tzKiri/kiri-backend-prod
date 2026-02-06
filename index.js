@@ -86,7 +86,7 @@ app.post("/ask", askLimiter, async (req, res) => {
 
     messagesForAI.unshift({
       role: "system",
-      content: "You are a professional customer support assistant. Be clear and helpful."
+      content: "You are a helpful assistant."
     });
 
     const response = await client.responses.create({
@@ -105,13 +105,11 @@ app.post("/ask", askLimiter, async (req, res) => {
     );
 
     res.json({ reply, conversationId: convoId });
-
   } catch (err) {
     console.error("ASK ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
 
 const PORT = process.env.PORT;
 
