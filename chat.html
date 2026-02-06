@@ -157,9 +157,13 @@ button {
 <div id="kiri-widget">
   <div id="header">KIRI AI</div>
 
+<button id="close">✕</button>
+
+
   <div id="messages">
     <div class="msg bot">Hello. How can I help you?</div>
   </div>
+
 
   <div id="inputBar">
     <input id="input" placeholder="Type your message…" onkeydown="if(event.key==='Enter') send()">
@@ -170,6 +174,10 @@ button {
 <script>
 let conversationId = localStorage.getItem("conversationId");
 const KIRI_API = "https://kiri-backend-prod-production.up.railway.app";
+
+  document.getElementById("close").onclick = () => {
+    parent.postMessage("kiri-close", "*");
+  };
 
 function toggle() {
   const w = document.getElementById("kiri-widget");
