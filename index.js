@@ -11,20 +11,12 @@ app.set("trust proxy", true);
 
 
 // Middleware
-const ALLOWED_ORIGINS = [
-  "https://your-site.com",
-  "http://localhost:3000"
-];
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  }
+  origin: true,
+  credentials: true
 }));
+
 app.use(express.json());
 app.use(express.static(__dirname));
 
