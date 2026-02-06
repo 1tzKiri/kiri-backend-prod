@@ -13,9 +13,14 @@ app.set("trust proxy", true);
 // Middleware
 
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: [
+    "https://kiri-backend-prod-production.up.railway.app",
+    "http://localhost:3000"
+  ],
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
 }));
+
 
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -81,10 +86,12 @@ app.post("/ask", askLimiter, async (req, res) => {
       content: "You are a helpful assistant."
     });
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: messagesForAI
-    });
+const response = await client.responses.create({
+  model: "gpt-4.1-mini",
+  input: messagesForAI,
+  max_output_tokens: 300,
+  temperature: 0.6
+});
 
     const reply =
       response.output_text ||
