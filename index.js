@@ -41,7 +41,22 @@ app.get("/", (req, res) => {
 
 // Chat endpoint
 app.post("/ask", askLimiter, async (req, res) => {
-  try {
+const { message, site_key } = req.body;
+
+if (!site_key) {
+  return res.status(400).json({ error: "Missing site key" });
+}
+
+const result = await pool.query(
+  "SELECT * FROM sites WHERE site_key = $1 AND active = true",
+  [site_key]
+);
+
+if (result.rows.length === 0) {
+  return res.status(403).json({ error: "Invalid site key" });
+}
+
+ try {
     if (!req.body || !req.body.message) {
       return res.status(400).json({ error: "Missing message" });
     }
