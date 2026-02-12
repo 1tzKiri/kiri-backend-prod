@@ -1,3 +1,5 @@
+const currentScript = document.currentScript;
+const SITE_KEY = currentScript.getAttribute("data-site-key");
 (function () {
   if (document.getElementById("kiri-launcher")) return;
 
@@ -26,7 +28,7 @@
 
   // 💬 Chat iframe (HIDDEN by default)
   const iframe = document.createElement("iframe");
-  iframe.src = "/chat.html";
+  iframe.src = `/chat.html?siteKey=${SITE_KEY}`;
   iframe.id = "kiri-widget";
 
   Object.assign(iframe.style, {

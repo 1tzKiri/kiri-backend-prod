@@ -41,7 +41,7 @@ app.get("/", (req, res) => {
 
 // Chat endpoint
 app.post("/ask", askLimiter, async (req, res) => {
-const { message, site_key } = req.body;
+const { message, conversationId, site_key } = req.body;
 
 if (!site_key) {
   return res.status(400).json({ error: "Missing site key" });

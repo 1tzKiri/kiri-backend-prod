@@ -174,6 +174,7 @@ button {
 <script>
 let conversationId = localStorage.getItem("conversationId");
 const KIRI_API = "https://kiri-backend-prod-production.up.railway.app";
+const SITE_KEY = new URLSearchParams(window.location.search).get("siteKey");
 
   document.getElementById("close").onclick = () => {
     parent.postMessage("kiri-close", "*");
@@ -209,7 +210,7 @@ async function send() {
     body: JSON.stringify({
   message: text,
   conversationId
-  site_key: "test123" 
+  site_key: SITE_KEY
 })
 
     });
