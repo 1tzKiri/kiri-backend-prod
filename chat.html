@@ -152,7 +152,7 @@ button {
 
 <body>
 
-<button id="kiri-btn" onclick="toggle()">K</button>
+<button id="kiri-btn">K</button>
 
 <div id="kiri-widget">
   <div id="header">KIRI AI</div>
@@ -210,7 +210,7 @@ async function send() {
     body: JSON.stringify({
   message: text,
   conversationId
-  site_key: SITE_KEY
+  site_key: "test123"
 })
 
     });
