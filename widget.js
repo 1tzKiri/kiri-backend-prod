@@ -15,7 +15,7 @@ const SITE_KEY = currentScript.getAttribute("data-site-key");
     width: "56px",
     height: "56px",
     borderRadius: "50%",
-    background: "#111",
+    
     color: "#fff",
     display: "flex",
     alignItems: "center",
@@ -51,7 +51,8 @@ const SITE_KEY = currentScript.getAttribute("data-site-key");
   };
 
   window.addEventListener("message", (e) => {
-    if (e.data === "kiri-close") {
+  if (e.origin !== "https://kiri-backend-prod-production.up.railway.app") return;
+  if (e.data === "kiri-close") {
       iframe.style.display = "none";
       button.style.display = "flex";
     }
