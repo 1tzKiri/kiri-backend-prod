@@ -41,7 +41,7 @@ const SITE_KEY = currentScript.getAttribute("data-site-key");
     borderRadius: "20px",
     display: "none",
     zIndex: "999999",
-    boxShadow: "0 30px 80px rgba(0,0,0,.5)"
+    
   });
 
   // 🔁 Toggle behavior
