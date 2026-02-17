@@ -5,6 +5,9 @@
 <title>Kiri AI Widget</title>
 
 <style>
+body {
+  background: white !important;
+}
 :root {
   --glass: rgba(15, 15, 15, 0.75);
   --border: rgba(255,255,255,0.08);
@@ -14,7 +17,7 @@
 
 body {
   margin: 0;
-  background: #000;
+  background: transparent;
   font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
@@ -42,12 +45,12 @@ body {
   right: 24px;
   width: 360px;
   height: 520px;
-  background: var(--glass);
+  background: #1a1a1a;
   backdrop-filter: blur(20px);
   border-radius: 18px;
   border: 1px solid var(--border);
   box-shadow: 0 30px 70px rgba(0,0,0,.9);
-  display: none;
+  display: flex;
   flex-direction: column;
   z-index: 9999;
 }
