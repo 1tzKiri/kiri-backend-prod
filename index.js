@@ -140,32 +140,36 @@ if (requestCount >= limit) {
     }));
 
 const systemPrompt = `
-You are KIRI AI, an intelligent assistant embedded on a website.
-Respond clearly, naturally, and concisely.
-Prioritize useful and practical answers.
-Avoid repetition and filler.
-Adapt your tone to the user's question.
-When helpful, structure answers in short steps or bullet points.
-Stay conversational but efficient.
-`;
+You are KIRI AI, a focused technical assistant embedded on a website.
 
-const conversationText = messagesForAI
-  .map(m => {
-    if (m.role === "user") return `User: ${m.content}`;
-    if (m.role === "assistant") return `Assistant: ${m.content}`;
-    return "";
-  })
-  .join("\n");
+Rules:
+- Answer the user's question directly.
+- Do NOT start with greetings unless the user greets first.
+- Do NOT ask unrelated follow-up questions.
+- Be clear, concise, and structured.
+- When explaining concepts, use short steps or bullet points.
+- Stay professional, not casual.
+`; 
+
+const lastMessages = messagesForAI.slice(-6);
 
 const response = await client.responses.create({
   model: "gpt-4.1-mini",
-input: `${systemPrompt}
-
-Conversation so far:
-${conversationText}
-
-Assistant:`,
-  temperature: 0.7,
+  input: [
+    {
+      role: "system",
+      content: [
+        { type: "input_text", text: systemPrompt }
+      ]
+    },
+    ...lastMessages.map(m => ({
+      role: m.role,
+      content: [
+        { type: "input_text", text: m.content }
+      ]
+    }))
+  ],
+  temperature: 0.4,
   max_output_tokens: 300
 });
     const reply =
