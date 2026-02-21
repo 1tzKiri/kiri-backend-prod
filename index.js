@@ -147,7 +147,9 @@ if (requestCount >= limit) {
     // Generate AI response
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: messagesForAI,
+      input: {
+        messages: messagesForAI
+      },
       max_output_tokens: 300,
       temperature: 0.6
     });
