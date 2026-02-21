@@ -5,9 +5,7 @@
 <title>Kiri AI Widget</title>
 
 <style>
-body {
-  background: white !important;
-}
+
 :root {
   --glass: rgba(15, 15, 15, 0.75);
   --border: rgba(255,255,255,0.08);
@@ -46,10 +44,10 @@ body {
   width: 360px;
   height: 520px;
   background: #1a1a1a;
-  backdrop-filter: blur(20px);
-  border-radius: 18px;
+  border-radius: 20px;
+  overflow: hidden;
   border: 1px solid var(--border);
-  box-shadow: 0 30px 70px rgba(0,0,0,.9);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
   display: flex;
   flex-direction: column;
   z-index: 9999;
@@ -66,13 +64,26 @@ body {
 
 /* HEADER */
 #header {
-  padding: 16px;
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  font-weight: 600;
+  font-size: 15px;
+  background: #111;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+#close {
+  background: none;
+  border: none;
+  color: white;
   font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  border-bottom: 1px solid var(--border);
-  color: #ffffff;
+  cursor: pointer;
+  padding: 0;
+}
+
+#close:hover {
+  opacity: 0.7;
 }
 
 /* MESSAGES */
@@ -80,8 +91,10 @@ body {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-
 .msg {
   max-width: 80%;
   margin-bottom: 12px;
@@ -93,16 +106,28 @@ body {
 
 /* USER MESSAGE */
 .user {
-  margin-left: auto;
-  background: rgba(255,255,255,0.12);
-  color: #ffffff; /* CONFIRMED WHITE */
+  align-self: flex-end;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 18px 18px 4px 18px;
+  max-width: 75%;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
 }
-
 /* AI MESSAGE */
 .bot {
-  margin-right: auto;
-  background: rgba(255,255,255,0.06);
-  color: #ffffff; /* FIXED: AI now white */
+  align-self: flex-start;
+  background: #1f2937;
+  color: #e5e7eb;
+  padding: 10px 14px;
+  border-radius: 18px 18px 18px 4px;
+  max-width: 75%;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  border: 1px solid rgba(255,255,255,0.05);
 }
 
 /* INPUT */
@@ -158,10 +183,10 @@ button {
 <button id="kiri-btn">K</button>
 
 <div id="kiri-widget">
-  <div id="header">KIRI AI</div>
-
-<button id="close">✕</button>
-
+<div id="header">
+  <span>KIRI AI</span>
+  <button id="close">x</button>
+</div>
 
   <div id="messages">
     <div class="msg bot">Hello. How can I help you?</div>
