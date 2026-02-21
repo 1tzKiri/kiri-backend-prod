@@ -139,21 +139,26 @@ if (requestCount >= limit) {
       content: m.content
     }));
 
-    messagesForAI.unshift({
-      role: "system",
-      content: "You are a helpful assistant."
-    });
+  messagesForAI.unshift({
+  role: "system",
+  content: "You are a helpful assistant."
+});
 
     // Generate AI response
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: {
-        messages: messagesForAI
-      },
-      max_output_tokens: 300,
-      temperature: 0.6
-    });
-
+ const response = await client.responses.create({
+  model: "gpt-4.1-mini",
+  input: messagesForAI.map(m => ({
+    role: m.role,
+    content: [
+      {
+        type: "text",
+        text: m.content || ""
+      }
+    ]
+  })),
+  temperature: 0.6,
+  max_output_tokens: 300
+});
     const reply =
       response.output_text ||
       response.output?.[0]?.content?.[0]?.text ||
