@@ -151,7 +151,7 @@ if (requestCount >= limit) {
     role: m.role,
     content: [
       {
-        type: "text",
+        type: "input_text",
         text: m.content || ""
       }
     ]
