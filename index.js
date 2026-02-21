@@ -125,19 +125,21 @@ if (requestCount >= limit) {
     // Get last messages
     const historyResult = await pool.query(
       `
-      SELECT role, content
-      FROM messages
-      WHERE conversation_id = $1
-      ORDER BY created_at ASC
-      LIMIT 10
+     SELECT role, content
+FROM messages
+WHERE conversation_id = $1
+ORDER BY created_at DESC
+LIMIT 10
       `,
       [convoId]
     );
 
-    const messagesForAI = historyResult.rows.map(m => ({
-      role: m.role,
-      content: m.content
-    }));
+  const messagesForAI = historyResult.rows
+  .reverse()
+  .map(m => ({
+    role: m.role,
+    content: m.content
+  }));
 
 const systemPrompt = `
 You are KIRI AI, a focused technical assistant embedded on a website.
@@ -167,7 +169,7 @@ Conversation so far:
 ${conversationText}
 
 Assistant:`,
-  temperature: 0.4,
+  temperature: 0.7,
   max_output_tokens: 300
 });
 
