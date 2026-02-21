@@ -37,7 +37,7 @@ app.get("/", (req, res) => {
 });
 
 // Chat endpoint
-app.post("/ask", askLimiter, async (req, res) => {
+app.post("/ask", async (req, res) => {
   try {
     const { message, conversationId, site_key } = req.body;
 
@@ -50,16 +50,50 @@ app.post("/ask", askLimiter, async (req, res) => {
     }
 
     // Validate site
-    const result = await pool.query(
-      "SELECT * FROM sites WHERE site_key = $1 AND active = true",
-      [site_key]
-    );
+  const result = await pool.query(
+  "SELECT * FROM sites WHERE site_key = $1 AND active = true",
+  [site_key]
+);
 
-    if (result.rows.length === 0) {
-      return res.status(403).json({ error: "Invalid site key" });
-    }
+if (result.rows.length === 0) {
+  return res.status(403).json({ error: "Invalid site key" });
+}
 
-    const site = result.rows[0];
+const site = result.rows[0];
+const plan = site.plan || "free";
+
+// 🔥 Tier-based rate limiting per site_key
+const limits = {
+  free: 10,
+  pro: 100,
+  enterprise: 1000
+};
+
+const limit = limits[plan] || 10;
+
+const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+
+const rateResult = await pool.query(
+  `
+  SELECT COUNT(*) 
+  FROM messages m
+  JOIN conversations c ON m.conversation_id = c.id
+  WHERE c.site_key = $1
+  AND m.role = 'user'
+  AND m.created_at > $2
+  `,
+  [site_key, oneMinuteAgo]
+);
+
+const requestCount = parseInt(rateResult.rows[0].count);
+
+if (requestCount >= limit) {
+  return res.status(429).json({
+    error: "Rate limit exceeded for your plan."
+  });
+}
+   
+   
 
     // Check monthly limit
     if (site.monthly_message_count >= site.monthly_limit) {
