@@ -153,22 +153,18 @@ Rules:
 
 const lastMessages = messagesForAI.slice(-6);
 
+const conversationText = lastMessages
+  .map(m => `${m.role.toUpperCase()}: ${m.content}`)
+  .join("\n");
+
 const response = await client.responses.create({
   model: "gpt-4.1-mini",
-  input: [
-    {
-      role: "system",
-      content: [
-        { type: "input_text", text: systemPrompt }
-      ]
-    },
-    ...lastMessages.map(m => ({
-      role: m.role,
-      content: [
-        { type: "input_text", text: m.content }
-      ]
-    }))
-  ],
+  input: `${systemPrompt}
+
+Conversation so far:
+${conversationText}
+
+Assistant:`,
   temperature: 0.4,
   max_output_tokens: 300
 });
