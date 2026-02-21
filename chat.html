@@ -48,7 +48,7 @@ body {
   overflow: hidden;
   border: 1px solid var(--border);
   box-shadow: 0 20px 60px rgba(0,0,0,.6);
-  display: flex;
+  display: flex;  /* keep flex layout */
   flex-direction: column;
   z-index: 9999;
 }
@@ -70,16 +70,18 @@ body {
   padding: 14px 16px;
   font-weight: 600;
   font-size: 15px;
-  background: #111;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: #ffffff;
+  color: #000000;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 #close {
   background: none;
   border: none;
-  color: white;
+  color: #e11d48; /* nice red */
   font-size: 18px;
   cursor: pointer;
   padding: 0;
+  font-weight: bold;
 }
 
 #close:hover {
@@ -179,8 +181,6 @@ button {
 </head>
 
 <body>
-
-<button id="kiri-btn">K</button>
 
 <div id="kiri-widget">
 <div id="header">

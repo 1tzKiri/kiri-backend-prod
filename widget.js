@@ -31,19 +31,22 @@ const SITE_KEY = currentScript.getAttribute("data-site-key");
   iframe.src = "https://kiri-backend-prod-production.up.railway.app/chat.html?siteKey=" + SITE_KEY;
   iframe.id = "kiri-widget";
 
-Object.assign(iframe.style, {
+Object.assign(button.style, {
   position: "fixed",
   bottom: "20px",
   right: "20px",
-  width: "380px",
-  height: "560px",
-  border: "none",
-  borderRadius: "20px",
-  overflow: "hidden",
-  background: "transparent",
-  boxShadow: "none",
-  display: "none",
+  width: "56px",
+  height: "56px",
+  borderRadius: "50%",
+  background: "#1a1a1a",
+  color: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontWeight: "bold",
+  cursor: "pointer",
   zIndex: "999999",
+  boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
 });
 
   // 🔁 Toggle behavior
