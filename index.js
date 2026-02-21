@@ -139,18 +139,33 @@ if (requestCount >= limit) {
       content: m.content
     }));
 
-  messagesForAI.unshift({
-  role: "system",
-  content: "You are a helpful assistant."
-});
+const systemPrompt = `
+You are KIRI AI, an intelligent assistant embedded on a website.
+Respond clearly, naturally, and concisely.
+Prioritize useful and practical answers.
+Avoid repetition and filler.
+Adapt your tone to the user's question.
+When helpful, structure answers in short steps or bullet points.
+Stay conversational but efficient.
+`;
 
-    // Generate AI response
+const conversationText = messagesForAI
+  .map(m => {
+    if (m.role === "user") return `User: ${m.content}`;
+    if (m.role === "assistant") return `Assistant: ${m.content}`;
+    return "";
+  })
+  .join("\n");
+
 const response = await client.responses.create({
   model: "gpt-4.1-mini",
-  input: messagesForAI
-    .map(m => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n"),
-  temperature: 0.6,
+input: `${systemPrompt}
+
+Conversation so far:
+${conversationText}
+
+Assistant:`,
+  temperature: 0.7,
   max_output_tokens: 300
 });
     const reply =
