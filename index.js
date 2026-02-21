@@ -153,9 +153,7 @@ Rules:
 - Stay professional, not casual.
 `; 
 
-const lastMessages = messagesForAI
-  .filter(m => m.role === "user")
-  .slice(-4);
+const lastMessages = messagesForAI.slice(-10);
 
 const conversationText = lastMessages
   .map(m => `${m.role.toUpperCase()}: ${m.content}`)
