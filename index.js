@@ -169,22 +169,6 @@ Conversation so far:
 ${conversationText}
 
 Assistant:`,
-  temperature: 0.7,
-  max_output_tokens: 300
-});
-
-const conversationText = lastMessages
-  .map(m => `${m.role.toUpperCase()}: ${m.content}`)
-  .join("\n");
-
-const response = await client.responses.create({
-  model: "gpt-4.1-mini",
-  input: `${systemPrompt}
-
-Conversation so far:
-${conversationText}
-
-Assistant:`,
   temperature: 0.4,
   max_output_tokens: 300
 });
