@@ -207,9 +207,9 @@ let conversationId = localStorage.getItem("conversationId");
 const KIRI_API = "https://kiri-backend-prod-production.up.railway.app";
 const SITE_KEY = new URLSearchParams(window.location.search).get("siteKey");
 
-  document.getElementById("close").onclick = () => {
-    parent.postMessage("kiri-close", "*");
-  };
+document.getElementById("close").onclick = () => {
+  parent.postMessage("kiri-close", "*");
+};
 
 function toggle() {
   const w = document.getElementById("kiri-widget");
@@ -238,28 +238,34 @@ async function send() {
       headers: {
         "Content-Type": "application/json"
       },
-    body: JSON.stringify({
-  message: text,
-  conversationId,
-  site_key: SITE_KEY
-})
-
+      body: JSON.stringify({
+        message: text,
+        conversationId,
+        site_key: SITE_KEY
+      })
     });
 
     const data = await res.json();
-if (data.conversationId) {
-  conversationId = data.conversationId;
-  localStorage.setItem("conversationId", conversationId);
-}
 
+    if (data.conversationId) {
+      conversationId = data.conversationId;
+      localStorage.setItem("conversationId", conversationId);
+    }
 
     messages.removeChild(typing);
-    messages.innerHTML += `<div class="msg bot">${data.reply}</div>`;
+
+    // 🔥 FIX: Proper handling of rate limit or backend errors
+    if (!res.ok) {
+      messages.innerHTML += `<div class="msg bot">${data.error || "Limit reached. Try again later."}</div>`;
+    } else {
+      messages.innerHTML += `<div class="msg bot">${data.reply}</div>`;
+    }
+
     messages.scrollTop = messages.scrollHeight;
 
   } catch (err) {
     messages.removeChild(typing);
-    messages.innerHTML += `<div class="msg bot">Error.</div>`;
+    messages.innerHTML += `<div class="msg bot">Server error. Try again later.</div>`;
     console.error(err);
   }
 }
