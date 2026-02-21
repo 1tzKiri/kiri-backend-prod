@@ -75,16 +75,15 @@ const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
 const rateResult = await pool.query(
   `
-  SELECT COUNT(*) 
+  SELECT COUNT(*)
   FROM messages m
   JOIN conversations c ON m.conversation_id = c.id
-  WHERE c.site_key = $1
+  WHERE c.site_id = $1
   AND m.role = 'user'
   AND m.created_at > $2
   `,
-  [site_key, oneMinuteAgo]
+  [site.id, oneMinuteAgo]
 );
-
 const requestCount = parseInt(rateResult.rows[0].count);
 
 if (requestCount >= limit) {
