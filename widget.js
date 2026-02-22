@@ -36,7 +36,7 @@ const SITE_KEY = currentScript.getAttribute("data-site-key");
 
   Object.assign(iframe.style, {
     position: "fixed",
-    bottom: "24px",
+    bottom: "90px",
     right: "20px",
     width: "360px",
     height: "520px",

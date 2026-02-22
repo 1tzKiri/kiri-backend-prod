@@ -206,23 +206,29 @@ button {
 
 <body>
 
-<div id="header">
-  <div class="header-left">
-    <span class="live-dot"></span>
-    <span class="title">KIRI AI</span>
+<div id="kiri-widget">
+
+  <div id="header">
+    <div class="header-left">
+      <span class="live-dot"></span>
+      <span class="title">KIRI AI</span>
+    </div>
+    <button id="close">×</button>
   </div>
-  <button id="close">×</button>
-</div>
 
   <div id="messages">
     <div class="msg bot">Hello. How can I help you?</div>
   </div>
 
-
   <div id="inputBar">
-    <input id="input" placeholder="Type your message…" onkeydown="if(event.key==='Enter') send()">
+    <input 
+      id="input" 
+      placeholder="Type your message..." 
+      onkeydown="if(event.key==='Enter') send()"
+    />
     <button onclick="send()">Send</button>
   </div>
+
 </div>
 
 <script>
