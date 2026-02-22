@@ -62,7 +62,7 @@ body {
   bottom: 100px;
   right: 24px;
   width: 360px;
-  max-height: 520px;   /* changed */
+  height: 520px;
   background: #1a1a1a;
   border-radius: 20px;
   overflow: hidden;
@@ -111,13 +111,14 @@ body {
 
 /* MESSAGES */
 #messages {
-  flex: 1;
+  flex: 1 1 auto;   /* IMPORTANT */
+  min-height: 0;    /* VERY IMPORTANT (fixes flex overflow bugs) */
   padding: 16px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: #1a1a1a;   /* ADD THIS */
+  background: #1a1a1a;
 }
 .msg {
   max-width: 80%;
