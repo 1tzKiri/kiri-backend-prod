@@ -20,6 +20,25 @@ body {
   font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: #00ff5b;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #00ff5b;
+}
+
+.title {
+  font-weight: 600;
+  color: white;
+}
+
 /* FLOATING BUTTON */
 #kiri-btn {
   position: fixed;
@@ -184,10 +203,12 @@ button {
 
 <body>
 
-<div id="kiri-widget">
 <div id="header">
-  <span>KIRI AI</span>
-  <button id="close">x</button>
+  <div class="header-left">
+    <span class="live-dot"></span>
+    <span class="title">KIRI AI</span>
+  </div>
+  <button id="close">×</button>
 </div>
 
   <div id="messages">
