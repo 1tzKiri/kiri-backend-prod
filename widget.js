@@ -31,9 +31,7 @@ const SITE_KEY = currentScript.getAttribute("data-site-key");
   // ✅ Chat iframe (hidden by default)
   const iframe = document.createElement("iframe");
   iframe.src =
-    "https://kiri-backend-prod-production.up.railway.app/chat.html?siteKey=" +
-    SITE_KEY;
-
+   "https://kiri-frontend.vercel.app/chat.html?siteKey=" + SITE_KEY;
   Object.assign(iframe.style, {
     position: "fixed",
     bottom: "90px",
