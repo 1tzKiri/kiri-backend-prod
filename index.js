@@ -72,6 +72,10 @@ const requestDomain = origin
   .replace(/^https?:\/\//, "")
   .split("/")[0];
 
+console.log("Origin:", origin);
+console.log("RequestDomain:", requestDomain);
+console.log("AllowedDomain:", site.allowed_domain);
+
 // Allow subdomains
 if (site.allowed_domain && !requestDomain.endsWith(site.allowed_domain)) {
   return res.status(403).json({ error: "Unauthorized domain" });
