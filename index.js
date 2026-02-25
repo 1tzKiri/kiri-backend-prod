@@ -49,8 +49,7 @@ app.post("/ask", async (req, res) => {
       return res.status(400).json({ error: "Missing message" });
     }
 
-    // Validate site
-  const result = await pool.query(
+const result = await pool.query(
   "SELECT * FROM sites WHERE site_key = $1 AND active = true",
   [site_key]
 );
@@ -60,6 +59,23 @@ if (result.rows.length === 0) {
 }
 
 const site = result.rows[0];
+
+// 🔐 DOMAIN VALIDATION
+const origin = req.headers.origin;
+
+if (!origin) {
+  return res.status(403).json({ error: "Missing origin header" });
+}
+
+// Normalize origin
+const requestDomain = origin
+  .replace(/^https?:\/\//, "")
+  .split("/")[0];
+
+// Allow subdomains
+if (site.domain && !requestDomain.endsWith(site.domain)) {
+  return res.status(403).json({ error: "Unauthorized domain" });
+}
 const plan = site.plan || "free";
 
 // 🔥 Tier-based rate limiting per site_key
