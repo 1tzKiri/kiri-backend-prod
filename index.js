@@ -73,7 +73,7 @@ const requestDomain = origin
   .split("/")[0];
 
 // Allow subdomains
-if (site.domain && !requestDomain.endsWith(site.domain)) {
+if (site.allowed_domain && !requestDomain.endsWith(site.allowed_domain)) {
   return res.status(403).json({ error: "Unauthorized domain" });
 }
 const plan = site.plan || "free";
