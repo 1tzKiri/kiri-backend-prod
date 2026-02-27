@@ -5,6 +5,7 @@ const path = require("path");
 const { OpenAI } = require("openai");
 const pool = require("./db");
 const rateLimit = require("express-rate-limit");
+const crypto = require("crypto");
 
 const app = express();
 app.set("trust proxy", true);
@@ -218,6 +219,33 @@ Assistant:`,
   } catch (err) {
     console.error("ASK ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/create-site", async (req, res) => {
+  const { name, domain } = req.body;
+
+  if (!name || !domain) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
+  const siteKey = crypto.randomBytes(16).toString("hex");
+
+  try {
+    await pool.query(
+      `INSERT INTO sites (name, site_key, domain, plan, active)
+       VALUES ($1, $2, $3, 'free', true)`,
+      [name, siteKey, domain]
+    );
+
+    return res.json({
+      siteKey,
+      embed: `<script src="https://kiri-backend-prod-production.up.railway.app/widget.js" data-site-key="${siteKey}"></script>`
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to create site" });
   }
 });
 
