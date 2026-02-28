@@ -223,29 +223,42 @@ Assistant:`,
 });
 
 app.post("/create-site", async (req, res) => {
-  const { name, domain } = req.body;
-
-  if (!name || !domain) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  const siteKey = crypto.randomBytes(16).toString("hex");
-
   try {
-    await pool.query(
-      `INSERT INTO sites (name, site_key, domain, plan, active)
-       VALUES ($1, $2, $3, 'free', true)`,
-      [name, siteKey, domain]
+    const { name, domain, plan } = req.body;
+
+    if (!name || !domain || !plan) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
+    // Find plan in DB
+    const planResult = await pool.query(
+      "SELECT * FROM plans WHERE name = $1",
+      [plan]
     );
 
-    return res.json({
-      siteKey,
-      embed: `<script src="https://kiri-backend-prod-production.up.railway.app/widget.js" data-site-key="${siteKey}"></script>`
-    });
+    if (planResult.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+
+    const planData = planResult.rows[0];
+
+    // Generate site key
+    const siteKey = require("crypto").randomBytes(16).toString("hex");
+
+    // Insert new site
+    await pool.query(
+      `INSERT INTO sites (name, domain, site_key, plan_id)
+       VALUES ($1, $2, $3, $4)`,
+      [name, domain, siteKey, planData.id]
+    );
+
+    const embed = `<script src="https://kiri-backend-prod-production.up.railway.app/widget.js" data-site-key="${siteKey}"></script>`;
+
+    res.json({ siteKey, embed });
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Failed to create site" });
+    console.error("Create site error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
