@@ -365,6 +365,43 @@ app.post("/site-usage", async (req, res) => {
   });
 });
 
+app.get("/admin-overview", async (req, res) => {
+  try {
+    // Get all sites with plan info
+    const result = await pool.query(`
+      SELECT 
+        s.id,
+        s.name,
+        s.monthly_message_count,
+        s.site_key,
+        p.name AS plan_name,
+        p.monthly_limit,
+        p.price
+      FROM sites s
+      JOIN plans p ON s.plan_id = p.id
+      ORDER BY s.id DESC
+    `);
+
+    const sites = result.rows;
+
+    const totalSites = sites.length;
+
+    const totalMonthlyRevenue = sites.reduce((sum, site) => {
+      return sum + parseFloat(site.price);
+    }, 0);
+
+    res.json({
+      totalSites,
+      totalMonthlyRevenue,
+      sites
+    });
+
+  } catch (err) {
+    console.error("Admin overview error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
