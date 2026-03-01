@@ -289,6 +289,38 @@ app.post("/create-site", async (req, res) => {
   }
 });
 
+app.post("/upgrade-plan", async (req, res) => {
+  const { siteKey, newPlan } = req.body;
+
+  if (!siteKey || !newPlan) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
+  // Find plan
+  const planResult = await pool.query(
+    "SELECT * FROM plans WHERE name = $1",
+    [newPlan]
+  );
+
+  if (planResult.rows.length === 0) {
+    return res.status(400).json({ error: "Invalid plan" });
+  }
+
+  const planId = planResult.rows[0].id;
+
+  // Update site
+  const updateResult = await pool.query(
+    "UPDATE sites SET plan_id = $1 WHERE site_key = $2 RETURNING *",
+    [planId, siteKey]
+  );
+
+  if (updateResult.rows.length === 0) {
+    return res.status(404).json({ error: "Site not found" });
+  }
+
+  res.json({ message: "Plan upgraded successfully" });
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
