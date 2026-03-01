@@ -321,6 +321,50 @@ app.post("/upgrade-plan", async (req, res) => {
   res.json({ message: "Plan upgraded successfully" });
 });
 
+app.post("/site-usage", async (req, res) => {
+  const { siteKey } = req.body;
+
+  if (!siteKey) {
+    return res.status(400).json({ error: "Missing site key" });
+  }
+
+  // Get site with plan info
+  const result = await pool.query(
+    `
+    SELECT 
+      s.id,
+      s.name,
+      s.monthly_message_count,
+      s.last_reset_at,
+      p.name AS plan_name,
+      p.monthly_limit,
+      p.price
+    FROM sites s
+    JOIN plans p ON s.plan_id = p.id
+    WHERE s.site_key = $1
+    `,
+    [siteKey]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Site not found" });
+  }
+
+  const site = result.rows[0];
+
+  const remaining = site.monthly_limit - site.monthly_message_count;
+
+  res.json({
+    name: site.name,
+    plan: site.plan_name,
+    monthlyUsed: site.monthly_message_count,
+    monthlyLimit: site.monthly_limit,
+    remaining,
+    price: site.price,
+    lastReset: site.last_reset_at
+  });
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
