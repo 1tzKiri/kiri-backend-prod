@@ -402,6 +402,54 @@ app.get("/admin-overview", async (req, res) => {
   }
 });
 
+app.post("/admin-update-plan", async (req, res) => {
+  const { siteId, newPlanName } = req.body;
+
+  if (!siteId || !newPlanName) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
+  try {
+    const planResult = await pool.query(
+      "SELECT * FROM plans WHERE name = $1",
+      [newPlanName]
+    );
+
+    if (planResult.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+
+    const plan = planResult.rows[0];
+
+    await pool.query(
+      "UPDATE sites SET plan_id = $1 WHERE id = $2",
+      [plan.id, siteId]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/admin-delete-site", async (req, res) => {
+  const { siteId } = req.body;
+
+  if (!siteId) {
+    return res.status(400).json({ error: "Missing siteId" });
+  }
+
+  try {
+    await pool.query("DELETE FROM sites WHERE id = $1", [siteId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
