@@ -64,6 +64,30 @@ if (result.rows.length === 0) {
 
 const site = result.rows[0];
 
+// --- AUTO MONTHLY RESET LOGIC ---
+
+const now = new Date();
+const lastReset = new Date(site.last_reset_at);
+
+const currentMonth = now.getMonth();
+const currentYear = now.getFullYear();
+
+const resetMonth = lastReset.getMonth();
+const resetYear = lastReset.getFullYear();
+
+// If new month started → reset counter
+if (currentMonth !== resetMonth || currentYear !== resetYear) {
+  await pool.query(
+    `UPDATE sites
+     SET monthly_message_count = 0,
+         last_reset_at = NOW()
+     WHERE id = $1`,
+    [site.id]
+  );
+
+  site.monthly_message_count = 0;
+}
+
 // 🔐 DOMAIN VALIDATION
 const origin = req.headers.origin;
 
