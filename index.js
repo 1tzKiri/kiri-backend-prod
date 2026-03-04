@@ -461,6 +461,31 @@ app.post("/admin-delete-site", verifyAdmin, async (req, res) => {
   }
 });
 
+app.get("/admin-conversations/:siteId", verifyAdmin, async (req, res) => {
+  const { siteId } = req.params;
+
+  try {
+    const result = await pool.query(`
+      SELECT 
+        c.id as conversation_id,
+        c.created_at,
+        m.role,
+        m.content,
+        m.created_at as message_time
+      FROM conversations c
+      JOIN messages m ON m.conversation_id = c.id
+      WHERE c.site_id = $1
+      ORDER BY m.created_at ASC
+    `, [siteId]);
+
+    res.json({ messages: result.rows });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
