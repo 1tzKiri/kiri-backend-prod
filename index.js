@@ -486,6 +486,42 @@ app.get("/admin-conversations/:siteId", verifyAdmin, async (req, res) => {
   }
 });
 
+app.post("/admin-scrape-site", verifyAdmin, async (req, res) => {
+
+  const { siteId, url } = req.body;
+
+  try {
+
+    const axios = require("axios");
+    const cheerio = require("cheerio");
+
+    const response = await axios.get(url);
+    const html = response.data;
+
+    const $ = cheerio.load(html);
+
+    let text = "";
+
+    $("p, h1, h2, h3, li").each((i, el) => {
+      text += $(el).text() + "\n";
+    });
+
+    await pool.query(
+      "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
+      [siteId, text]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+
+    console.error("Scrape error:", err);
+    res.status(500).json({ error: "Scrape failed" });
+
+  }
+
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
