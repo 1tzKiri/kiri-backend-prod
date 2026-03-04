@@ -6,6 +6,7 @@ const { OpenAI } = require("openai");
 const pool = require("./db");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 const app = express();
 app.set("trust proxy", true);
@@ -365,7 +366,17 @@ app.post("/site-usage", async (req, res) => {
   });
 });
 
-app.get("/admin-overview", async (req, res) => {
+function verifyAdmin(req, res, next) {
+  const adminKey = req.headers["x-admin-secret"];
+
+  if (!adminKey || adminKey !== ADMIN_SECRET) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  next();
+}
+
+app.get("/admin-overview", verifyAdmin, async (req, res) => {
   try {
     // Get all sites with plan info
     const result = await pool.query(`
@@ -402,7 +413,7 @@ app.get("/admin-overview", async (req, res) => {
   }
 });
 
-app.post("/admin-update-plan", async (req, res) => {
+app.post("/admin-update-plan", verifyAdmin, async (req, res) => {
   const { siteId, newPlanName } = req.body;
 
   if (!siteId || !newPlanName) {
@@ -434,7 +445,7 @@ app.post("/admin-update-plan", async (req, res) => {
   }
 });
 
-app.post("/admin-delete-site", async (req, res) => {
+app.post("/admin-delete-site", verifyAdmin, async (req, res) => {
   const { siteId } = req.body;
 
   if (!siteId) {
