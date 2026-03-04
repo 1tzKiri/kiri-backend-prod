@@ -13,9 +13,9 @@ app.set("trust proxy", true);
 
 // Middleware
 app.use(cors({
-  origin: "*",
+  origin: ["https://kiri-frontend.vercel.app"],
   methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"]
+  allowedHeaders: ["Content-Type", "x-admin-secret"]
 }));
 
 app.use(express.json());
