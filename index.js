@@ -66,6 +66,13 @@ if (result.rows.length === 0) {
 
 const site = result.rows[0];
 
+const knowledge = await pool.query(
+  "SELECT content FROM knowledge_chunks WHERE site_id = $1 LIMIT 5",
+  [site.id]
+);
+
+const knowledgeText = knowledge.rows.map(r => r.content).join("\n\n");
+
 // --- AUTO MONTHLY RESET LOGIC ---
 
 const now = new Date();
@@ -194,12 +201,15 @@ LIMIT 10
 const systemPrompt = `
 You are KIRI AI, a focused technical assistant embedded on a website.
 
+Website knowledge:
+${knowledgeText}
+
 Rules:
 - Always respond in the same language as the user's last message.
 - If the user writes in Polish, respond in Polish.
 - If the user writes in German, respond in German.
 - Otherwise respond in English.
-- Answer directly and clearly.
+- Answer directly and cleanly.
 - Do not add unnecessary greetings.
 - Be concise and structured.
 `;
