@@ -498,12 +498,11 @@ app.get("/admin-conversations/:siteId", verifyAdmin, async (req, res) => {
 });
 
 app.post("/admin-scrape-site", verifyAdmin, async (req, res) => {
+const { siteId, url } = req.body;
 
-  const { siteId, url } = req.body;
+try {
 
-  try {
-
-   const axios = require("axios");
+const axios = require("axios");
 const cheerio = require("cheerio");
 
 const visited = new Set();
@@ -552,14 +551,12 @@ await pool.query(
   [siteId, allText]
 );
 
-    res.json({ success: true });
+res.json({ success: true, pages_scraped: visited.size });
 
-  } catch (err) {
-
-    console.error("Scrape error:", err);
-    res.status(500).json({ error: "Scrape failed" });
-
-  }
+} catch (err) {
+  console.error("Scrape error:", err);
+  res.status(500).json({ error: "Scrape failed" });
+}
 
 });
 
