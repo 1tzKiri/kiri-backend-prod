@@ -503,24 +503,54 @@ app.post("/admin-scrape-site", verifyAdmin, async (req, res) => {
 
   try {
 
-    const axios = require("axios");
-    const cheerio = require("cheerio");
+   const axios = require("axios");
+const cheerio = require("cheerio");
 
-    const response = await axios.get(url);
+const visited = new Set();
+const toVisit = [url];
+
+let allText = "";
+
+while (toVisit.length > 0 && visited.size < 10) {
+  const currentUrl = toVisit.shift();
+
+  if (visited.has(currentUrl)) continue;
+  visited.add(currentUrl);
+
+  try {
+    const response = await axios.get(currentUrl);
     const html = response.data;
 
     const $ = cheerio.load(html);
 
-    let text = "";
-
     $("p, h1, h2, h3, li").each((i, el) => {
-      text += $(el).text() + "\n";
+      allText += $(el).text() + "\n";
     });
 
-    await pool.query(
-      "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
-      [siteId, text]
-    );
+    $("a").each((i, el) => {
+      const link = $(el).attr("href");
+
+      if (!link) return;
+
+      if (link.startsWith("/") || link.startsWith(url)) {
+        const full =
+          link.startsWith("http") ? link : new URL(link, url).href;
+
+        if (!visited.has(full)) {
+          toVisit.push(full);
+        }
+      }
+    });
+
+  } catch (err) {
+    console.log("skip", currentUrl);
+  }
+}
+
+await pool.query(
+  "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
+  [siteId, allText]
+);
 
     res.json({ success: true });
 
