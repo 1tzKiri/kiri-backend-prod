@@ -586,6 +586,44 @@ app.post("/admin/takeover", verifyAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
+app.get("/admin/conversations", async (req, res) => {
+  const result = await pool.query(`
+    SELECT conversations.id, conversations.created_at, sites.domain
+    FROM conversations
+    JOIN sites ON conversations.site_id = sites.id
+    ORDER BY conversations.created_at DESC
+    LIMIT 50
+  `);
+
+  res.json(result.rows);
+});
+
+app.get("/admin/messages/:conversationId", async (req, res) => {
+
+  const { conversationId } = req.params;
+
+  const messages = await pool.query(
+    "SELECT role, content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC",
+    [conversationId]
+  );
+
+  res.json(messages.rows);
+
+});
+
+app.post("/admin/reply", async (req, res) => {
+
+  const { conversationId, message } = req.body;
+
+  await pool.query(
+    "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
+    [conversationId, "assistant", message]
+  );
+
+  res.json({ success: true });
+
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
