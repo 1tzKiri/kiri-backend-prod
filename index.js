@@ -176,13 +176,13 @@ if (takeoverCheck.rows[0]?.human_takeover) {
   return res.json({
     reply: "A human agent will continue this conversation shortly."
   });
-}
+
 
       await pool.query(
         "UPDATE sites SET total_conversations = total_conversations + 1 WHERE id = $1",
         [site.id]
       );
-    
+     }
 
     // Save user message
     await pool.query(
@@ -569,6 +569,21 @@ res.json({ success: true, pages_scraped: visited.size });
   res.status(500).json({ error: "Scrape failed" });
 }
 
+});
+
+app.post("/admin/takeover", verifyAdmin, async (req, res) => {
+  const { conversationId } = req.body;
+
+  if (!conversationId) {
+    return res.status(400).json({ error: "Missing conversationId" });
+  }
+
+  await pool.query(
+    "UPDATE conversations SET human_takeover = true WHERE id = $1",
+    [conversationId]
+  );
+
+  res.json({ success: true });
 });
 
 const PORT = process.env.PORT;
