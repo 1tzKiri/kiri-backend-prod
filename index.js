@@ -167,6 +167,12 @@ if (requestCount >= limit) {
 
       convoId = convo.rows[0].id;
 
+      await pool.query(
+        "UPDATE sites SET total_conversations = total_conversations + 1 WHERE id = $1",
+        [site.id]
+      );
+     }
+
 const takeoverCheck = await pool.query(
   "SELECT human_takeover FROM conversations WHERE id = $1",
   [convoId]
@@ -176,13 +182,7 @@ if (takeoverCheck.rows[0]?.human_takeover) {
   return res.json({
     reply: "A human agent will continue this conversation shortly."
   });
-
-
-      await pool.query(
-        "UPDATE sites SET total_conversations = total_conversations + 1 WHERE id = $1",
-        [site.id]
-      );
-     }
+ }
 
     // Save user message
     await pool.query(
