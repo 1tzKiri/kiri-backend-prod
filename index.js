@@ -225,6 +225,33 @@ Rules:
 - Be concise and structured.
 `;
 
+const humanTriggers = [
+  "human",
+  "agent",
+  "support",
+  "real person",
+  "talk to human",
+  "customer service",
+  "talk to a person"
+];
+
+const wantsHuman = humanTriggers.some(trigger =>
+  message.toLowerCase().includes(trigger)
+);
+
+if (wantsHuman) {
+
+  await pool.query(
+    "UPDATE conversations SET human_takeover = true WHERE id = $1",
+    [convoId]
+  );
+
+  return res.json({
+    reply: "Sure — a human agent will join the conversation shortly."
+  });
+
+}
+
 const lastMessages = messagesForAI.slice(-10);
 
 const conversationText = lastMessages
