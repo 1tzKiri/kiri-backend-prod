@@ -178,11 +178,31 @@ const takeoverCheck = await pool.query(
   [convoId]
 );
 
+const msg = message.toLowerCase();
+
 if (takeoverCheck.rows[0]?.human_takeover) {
-  return res.json({
-    reply: "A human agent will continue this conversation shortly."
-  });
- }
+
+  if (
+    msg.includes("return to ai") ||
+    msg.includes("back to ai") ||
+    msg.includes("cancel human") ||
+    msg.includes("use ai")
+  ) {
+
+    await pool.query(
+      "UPDATE conversations SET human_takeover = false WHERE id = $1",
+      [convoId]
+    );
+
+  } else {
+
+    return res.json({
+      reply: "A human agent will continue this conversation shortly."
+    });
+
+  }
+
+}
 
     // Save user message
     await pool.query(
