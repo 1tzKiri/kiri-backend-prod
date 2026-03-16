@@ -536,65 +536,109 @@ app.get("/admin-conversations/:siteId", verifyAdmin, async (req, res) => {
 });
 
 app.post("/admin-scrape-site", verifyAdmin, async (req, res) => {
-const { siteId, url } = req.body;
-
-try {
-
-const axios = require("axios");
-const cheerio = require("cheerio");
-
-const visited = new Set();
-const toVisit = [url];
-
-let allText = "";
-
-while (toVisit.length > 0 && visited.size < 10) {
-  const currentUrl = toVisit.shift();
-
-  if (visited.has(currentUrl)) continue;
-  visited.add(currentUrl);
+  const { siteId, url } = req.body;
 
   try {
-    const response = await axios.get(currentUrl);
-    const html = response.data;
+    const axios = require("axios");
+    const cheerio = require("cheerio");
 
-    const $ = cheerio.load(html);
+    const visited = new Set();
+    const toVisit = [url];
 
-    $("p, h1, h2, h3, li").each((i, el) => {
-      allText += $(el).text() + "\n";
-    });
+    const baseDomain = new URL(url).hostname;
 
-    $("a").each((i, el) => {
-      const link = $(el).attr("href");
+    let allText = "";
 
-      if (!link) return;
+    while (toVisit.length > 0 && visited.size < 15) {
 
-      if (link.startsWith("/") || link.startsWith(url)) {
-        const full =
-          link.startsWith("http") ? link : new URL(link, url).href;
+      const currentUrl = toVisit.shift();
 
-        if (!visited.has(full)) {
-          toVisit.push(full);
-        }
+      if (visited.has(currentUrl)) continue;
+
+      visited.add(currentUrl);
+
+      try {
+
+        const response = await axios.get(currentUrl, { timeout: 10000 });
+
+        const html = response.data;
+
+        const $ = cheerio.load(html);
+
+        $("p, h1, h2, h3, li").each((i, el) => {
+          const text = $(el).text().trim();
+          if (text.length > 30) {
+            allText += text + "\n";
+          }
+        });
+
+        $("a").each((i, el) => {
+
+          const link = $(el).attr("href");
+
+          if (!link) return;
+
+          let full;
+
+          if (link.startsWith("http")) {
+            full = link;
+          } else if (link.startsWith("/")) {
+            full = new URL(link, url).href;
+          } else {
+            return;
+          }
+
+          try {
+
+            const hostname = new URL(full).hostname;
+
+            if (hostname === baseDomain && !visited.has(full)) {
+              toVisit.push(full);
+            }
+
+          } catch {}
+
+        });
+
+      } catch {
+        console.log("skip:", currentUrl);
       }
+
+    }
+
+    // remove old knowledge
+    await pool.query(
+      "DELETE FROM knowledge_chunks WHERE site_id = $1",
+      [siteId]
+    );
+
+    // split into chunks
+    const chunks = allText.match(/.{1,1200}/gs) || [];
+
+    for (const chunk of chunks) {
+
+      await pool.query(
+        "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
+        [siteId, chunk]
+      );
+
+    }
+
+    res.json({
+      success: true,
+      pages_scraped: visited.size,
+      chunks_created: chunks.length
     });
 
   } catch (err) {
-    console.log("skip", currentUrl);
+
+    console.error("Scrape error:", err);
+
+    res.status(500).json({
+      error: "Scrape failed"
+    });
+
   }
-}
-
-await pool.query(
-  "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
-  [siteId, allText]
-);
-
-res.json({ success: true, pages_scraped: visited.size });
-
-} catch (err) {
-  console.error("Scrape error:", err);
-  res.status(500).json({ error: "Scrape failed" });
-}
 
 });
 
