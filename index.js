@@ -695,7 +695,8 @@ app.post("/admin/reply", async (req, res) => {
 
 });
 
-app.post("/admin/return-to-ai", verifyAdmin, async (req, res) => {
+app.post("/admin/return-to-ai", async (req, res) => {
+
   const { conversationId } = req.body;
 
   try {
@@ -709,12 +710,12 @@ app.post("/admin/return-to-ai", verifyAdmin, async (req, res) => {
 
   } catch (err) {
 
-    console.error(err);
+    console.error("Return to AI error:", err);
     res.status(500).json({ error: "Failed to return to AI" });
 
   }
-});
 
+});
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
