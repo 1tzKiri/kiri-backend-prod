@@ -695,6 +695,26 @@ app.post("/admin/reply", async (req, res) => {
 
 });
 
+app.post("/admin/return-to-ai", verifyAdmin, async (req, res) => {
+  const { conversationId } = req.body;
+
+  try {
+
+    await pool.query(
+      "UPDATE conversations SET human_takeover = false WHERE id = $1",
+      [conversationId]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+
+    console.error(err);
+    res.status(500).json({ error: "Failed to return to AI" });
+
+  }
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
