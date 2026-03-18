@@ -788,6 +788,10 @@ app.get("/admin/messages/:id", async (req, res) => {
 app.post("/admin/reply", async (req, res) => {
   const { conversationId, message } = req.body;
 
+  if (!conversationId || !message) {
+    return res.status(400).json({ error: "Missing data" });
+  }
+
   await pool.query(
     "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
     [conversationId, "human", message]
@@ -795,7 +799,6 @@ app.post("/admin/reply", async (req, res) => {
 
   res.json({ success: true });
 });
-
 
 const PORT = process.env.PORT;
 
