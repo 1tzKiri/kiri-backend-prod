@@ -763,6 +763,40 @@ app.post("/admin/return-to-ai", async (req, res) => {
 
 });
 
+app.get("/admin/conversations", async (req, res) => {
+  const result = await pool.query(`
+    SELECT conversations.id, conversations.created_at, conversations.human_takeover, sites.domain
+    FROM conversations
+    JOIN sites ON conversations.site_id = sites.id
+    ORDER BY conversations.created_at DESC
+  `);
+
+  res.json(result.rows);
+});
+
+app.get("/admin/messages/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const result = await pool.query(
+    "SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC",
+    [id]
+  );
+
+  res.json(result.rows);
+});
+
+app.post("/admin/reply", async (req, res) => {
+  const { conversationId, message } = req.body;
+
+  await pool.query(
+    "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
+    [conversationId, "human", message]
+  );
+
+  res.json({ success: true });
+});
+
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
