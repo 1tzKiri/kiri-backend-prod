@@ -800,6 +800,21 @@ app.post("/admin/reply", async (req, res) => {
   res.json({ success: true });
 });
 
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const result = await db.query(
+    "SELECT * FROM users WHERE email = $1 AND password = $2",
+    [email, password]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(401).json({ error: "Invalid" });
+  }
+
+  res.json({ success: true });
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
