@@ -13,7 +13,7 @@ const app = express();
 app.set("trust proxy", true);
 
 // Middleware
-app.use(cors({
+app.use(cors());
   origin: "*",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "x-admin-secret"]
