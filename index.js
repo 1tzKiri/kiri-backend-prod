@@ -14,7 +14,7 @@ app.set("trust proxy", true);
 
 // Middleware
 app.use(cors({
-  origin: ["https://kiri-frontend.vercel.app"],
+  origin: "*",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "x-admin-secret"]
 }));
@@ -800,19 +800,42 @@ app.post("/admin/reply", async (req, res) => {
   res.json({ success: true });
 });
 
+
+app.post("/register", async (req, res) => {
+  const { email, password, site_key } = req.body;
+
+  try {
+    await db.query(
+      "INSERT INTO users (email, password, role, site_key) VALUES ($1,$2,$3,$4)",
+      [email, password, "user", site_key]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: "User exists" });
+  }
+});
+
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   const result = await db.query(
-    "SELECT * FROM users WHERE email = $1 AND password = $2",
+    "SELECT * FROM users WHERE email=$1 AND password=$2",
     [email, password]
   );
 
   if (result.rows.length === 0) {
-    return res.status(401).json({ error: "Invalid" });
+    return res.status(401).json({ error: "Invalid login" });
   }
 
-  res.json({ success: true });
+  const user = result.rows[0];
+
+  res.json({
+    success: true,
+    role: user.role,
+    site_key: user.site_key
+  });
 });
 
 const PORT = process.env.PORT;
