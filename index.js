@@ -850,6 +850,22 @@ app.post("/login", async (req, res) => {
   }
 });
 
+app.get("/conversations", async (req, res) => {
+  try {
+    const { site_key } = req.query;
+
+    const result = await pool.query(
+      "SELECT * FROM conversations WHERE site_key = $1 ORDER BY id DESC",
+      [site_key]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
