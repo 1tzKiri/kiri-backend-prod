@@ -824,24 +824,30 @@ app.post("/register", async (req, res) => {
 });
 
 app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const result = await db.query(
-    "SELECT * FROM users WHERE email=$1 AND password=$2",
-    [email, password]
-  );
+    const result = await pool.query(
+      "SELECT * FROM users WHERE email = $1 AND password = $2",
+      [email, password]
+    );
 
-  if (result.rows.length === 0) {
-    return res.status(401).json({ error: "Invalid login" });
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: "Invalid login" });
+    }
+
+    const user = result.rows[0];
+
+    res.json({
+      success: true,
+      role: user.role,
+      site_key: user.site_key
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
-
-  const user = result.rows[0];
-
-  res.json({
-    success: true,
-    role: user.role,
-    site_key: user.site_key
-  });
 });
 
 const PORT = process.env.PORT;
