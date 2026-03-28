@@ -13,11 +13,12 @@ const app = express();
 app.set("trust proxy", true);
 
 // Middleware
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type", "x-admin-secret"]
-}));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "*");
+  res.header("Access-Control-Allow-Methods", "*");
+  next();
+});
 
 app.use(express.json());
 app.use(express.static(__dirname));
