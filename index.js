@@ -866,6 +866,26 @@ app.get("/conversations", async (req, res) => {
   }
 });
 
+app.post("/admin/create-user", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // generate unique site_key
+    const site_key = Math.random().toString(36).substring(2, 10);
+
+    await pool.query(
+      "INSERT INTO users (email, password, role, site_key) VALUES ($1, $2, $3, $4)",
+      [email, password, "user", site_key]
+    );
+
+    res.json({ success: true, site_key });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "error creating user" });
+  }
+});
+
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
