@@ -877,11 +877,10 @@ app.post("/admin/create-user", async (req, res) => {
       [email, password, "user", site_key]
     );
 
-    // 🔥 THIS FIXES EVERYTHING
-    await pool.query(
-      "INSERT INTO sites (site_key, domain) VALUES ($1, $2)",
-      [site_key, "unknown"]
-    );
+  await pool.query(
+  "INSERT INTO sites (name, site_key) VALUES ($1, $2)",
+  ["New Client", site_key]
+);
 
     res.json({ success: true, site_key });
 
