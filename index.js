@@ -107,21 +107,15 @@ if (currentMonth !== resetMonth || currentYear !== resetYear) {
 const origin = req.headers.origin;
 
 if (!origin) {
-  return res.status(403).json({ error: "Missing origin header" });
-}
+  console.log("No origin — allowing");
+} else {
+  const requestDomain = origin
+    .replace(/^https?:\/\//, "")
+    .split("/")[0];
 
-// Normalize origin
-const requestDomain = origin
-  .replace(/^https?:\/\//, "")
-  .split("/")[0];
-
-console.log("Origin:", origin);
-console.log("RequestDomain:", requestDomain);
-console.log("AllowedDomain:", site.allowed_domain);
-
-// Allow subdomains
-if (site.allowed_domain && !requestDomain.endsWith(site.allowed_domain)) {
-  return res.status(403).json({ error: "Unauthorized domain" });
+  if (site.allowed_domain && !requestDomain.endsWith(site.allowed_domain)) {
+    return res.status(403).json({ error: "Unauthorized domain" });
+  }
 }
 const plan = site.plan || "free";
 
