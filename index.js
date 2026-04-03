@@ -827,7 +827,7 @@ app.post("/register", async (req, res) => {
 
     const siteKey = Math.random().toString(36).substring(2, 12);
 
-    await db.query(
+    await pool.query(
       "INSERT INTO sites (user_id, name, site_key, active) VALUES ($1, $2, $3, true)",
       [userId, "New Site", siteKey]
     );
