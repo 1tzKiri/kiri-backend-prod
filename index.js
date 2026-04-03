@@ -815,9 +815,33 @@ app.post("/admin/reply", async (req, res) => {
 
 
 app.post("/register", async (req, res) => {
-  res.json({ ok: true });
-});
+  const { email, password } = req.body;
 
+  try {
+    const result = await db.query(
+      "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user') RETURNING id",
+      [email, password]
+    );
+
+    const userId = result.rows[0].id;
+
+    const siteKey = Math.random().toString(36).substring(2, 12);
+
+    await db.query(
+      "INSERT INTO sites (user_id, name, site_key, active) VALUES ($1, $2, $3, true)",
+      [userId, "New Site", siteKey]
+    );
+
+    res.json({
+      success: true,
+      site_key: siteKey
+    });
+
+  } catch (err) {
+    console.log("REGISTER ERROR:", err);
+    res.status(500).json({ error: "fail" });
+  }
+});
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
