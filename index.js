@@ -70,7 +70,6 @@ const result = await pool.query(
    FROM sites
    JOIN plans ON sites.plan_id = plans.id
    WHERE LOWER(sites.site_key) = LOWER($1)
-   AND sites.active = true`,
   [site_key]
 );
 
