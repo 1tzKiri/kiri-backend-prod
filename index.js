@@ -815,7 +815,6 @@ app.post("/admin/reply", async (req, res) => {
 
 
 app.post("/register", async (req, res) => {
- app.post("/register", async (req, res) => {
   res.json({ ok: true });
 });
 
