@@ -93,7 +93,7 @@ if (origin && site.allowed_domain) {
   if (!requestDomain.endsWith(site.allowed_domain)) {
     return res.status(403).json({ error: "Unauthorized domain" });
   }
-});
+}
 
 // --- AUTO MONTHLY RESET LOGIC ---
 
