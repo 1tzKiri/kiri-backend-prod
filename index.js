@@ -119,24 +119,7 @@ if (currentMonth !== resetMonth || currentYear !== resetYear) {
   site.monthly_message_count = 0;
 }
 
-// 🔐 DOMAIN VALIDATION
-const origin = req.headers.origin;
 
-if (!origin) {
-  console.log("No origin — allowing");
-} else {
-  const requestDomain = origin
-    .replace(/^https?:\/\//, "")
-    .split("/")[0];
-
-  console.log("Origin:", origin);
-  console.log("RequestDomain:", requestDomain);
-  console.log("AllowedDomain:", site.allowed_domain);
-
-  if (site.allowed_domain && !requestDomain.endsWith(site.allowed_domain)) {
-    return res.status(403).json({ error: "Unauthorized domain" });
-  }
-}
 const plan = site.plan || "free";
 
 // 🔥 Tier-based rate limiting per site_key
