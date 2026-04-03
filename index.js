@@ -68,7 +68,7 @@ console.log(test.rows);
 const result = await pool.query(  
 `SELECT sites.*, plans.monthly_limit
    FROM sites
-   JOIN plans ON sites.plan_id = plans.id
+   LEFT JOIN plans ON sites.plan_id = plans.id
    WHERE LOWER(sites.site_key) = LOWER($1)`,
   [site_key]
 );
