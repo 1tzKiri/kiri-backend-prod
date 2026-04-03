@@ -81,6 +81,12 @@ if (result.rows.length === 0) {
 }
 
 const site = result.rows[0];
+const knowledge = await pool.query(
+  "SELECT content FROM knowledge_chunks WHERE site_id = $1 LIMIT 5",
+  [site.id]
+);
+
+const knowledgeText = knowledge.rows.map(r => r.content).join("\n\n");
 
 // 🔥 DOMAIN DEBUG
 const origin = req.headers.origin;
