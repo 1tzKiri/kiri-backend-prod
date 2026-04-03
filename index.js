@@ -61,8 +61,12 @@ if (!message) {
   return res.status(400).json({ error: "Missing message" });
 }
 
-const result = await pool.query(
-  `SELECT sites.*, plans.monthly_limit
+console.log("ALL SITES TEST:");
+const test = await pool.query("SELECT site_key FROM sites");
+console.log(test.rows);
+
+const result = await pool.query(  
+`SELECT sites.*, plans.monthly_limit
    FROM sites
    JOIN plans ON sites.plan_id = plans.id
    WHERE LOWER(sites.site_key) = LOWER($1)
