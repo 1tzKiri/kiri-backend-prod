@@ -818,7 +818,7 @@ app.post("/register", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const result = await db.query(
+    const result = await pool.query(
       "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user') RETURNING id",
       [email, password]
     );
