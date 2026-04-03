@@ -818,20 +818,22 @@ app.post("/register", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const result = await pool.query(
-      "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user') RETURNING id",
+    // create user
+    await pool.query(
+      "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user')",
       [email, password]
     );
 
-    const userId = result.rows[0].id;
-
+    // generate site key
     const siteKey = Math.random().toString(36).substring(2, 12);
 
+    // create site (NO user_id)
     await pool.query(
-      "INSERT INTO sites (user_id, name, site_key, active) VALUES ($1, $2, $3, true)",
-      [userId, "New Site", siteKey]
+      "INSERT INTO sites (name, site_key, active) VALUES ($1, $2, true)",
+      ["New Site", siteKey]
     );
 
+    // return site key
     res.json({
       success: true,
       site_key: siteKey
@@ -842,6 +844,7 @@ app.post("/register", async (req, res) => {
     res.status(500).json({ error: "fail" });
   }
 });
+
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
