@@ -818,34 +818,25 @@ app.post("/register", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // 1. create user
-    const userResult = await pool.query(
-      `INSERT INTO users (email, password, role)
-       VALUES ($1, $2, 'user')
-       RETURNING id`,
+    const result = await db.query(
+      "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user') RETURNING id",
       [email, password]
     );
 
-    const userId = userResult.rows[0].id;
+    const userId = result.rows[0].id;
 
-    // 2. generate site key
-    const siteKey = Math.random().toString(36).substring(2, 15);
+    const siteKey = Math.random().toString(36).substring(2, 12);
 
-    // 3. create site
-    await pool.query(
-      `INSERT INTO sites (user_id, name, site_key, plan_id, active)
-       VALUES ($1, $2, $3, 1, true)`,
+    await db.query(
+      "INSERT INTO sites (user_id, name, site_key, active) VALUES ($1, $2, $3, true)",
       [userId, "New Site", siteKey]
     );
 
-    res.json({
-      success: true,
-      site_key: siteKey
-    });
+    res.json({ success: true, site_key: siteKey });
 
   } catch (err) {
-    console.error("REGISTER ERROR:", err);
-    res.status(500).json({ error: "User exists or error" });
+    console.log("REGISTER ERROR:", err);
+    res.status(500).json({ error: "fail" });
   }
 });
 
