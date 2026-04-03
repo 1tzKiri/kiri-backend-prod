@@ -46,17 +46,18 @@ app.get("/", (req, res) => {
 });
 
 // Chat endpoint
-app.post("/ask", async (req, res) => {
-  try {
-    const { message, conversationId, site_key } = req.body;
+const { message, conversationId, site_key } = req.body;
 
-    if (!site_key) {
-      return res.status(400).json({ error: "Missing site key" });
-    }
+// 🔥 DEBUG
+console.log("SITE_KEY:", site_key);
 
-    if (!message) {
-      return res.status(400).json({ error: "Missing message" });
-    }
+if (!site_key) {
+  return res.status(400).json({ error: "Missing site key" });
+}
+
+if (!message) {
+  return res.status(400).json({ error: "Missing message" });
+}
 
 const result = await pool.query(
   `SELECT sites.*, plans.monthly_limit
@@ -66,18 +67,31 @@ const result = await pool.query(
   [site_key]
 );
 
+// 🔥 DEBUG
+console.log("DB RESULT:", result.rows);
+
 if (result.rows.length === 0) {
   return res.status(403).json({ error: "Invalid site key" });
 }
 
 const site = result.rows[0];
 
-const knowledge = await pool.query(
-  "SELECT content FROM knowledge_chunks WHERE site_id = $1 LIMIT 5",
-  [site.id]
-);
+// 🔥 DOMAIN DEBUG
+const origin = req.headers.origin;
 
-const knowledgeText = knowledge.rows.map(r => r.content).join("\n\n");
+console.log("ORIGIN:", origin);
+console.log("ALLOWED DOMAIN:", site.allowed_domain);
+
+// ✅ CLEAN DOMAIN VALIDATION
+if (origin && site.allowed_domain) {
+  const requestDomain = origin
+    .replace(/^https?:\/\//, "")
+    .split("/")[0];
+
+  if (!requestDomain.endsWith(site.allowed_domain)) {
+    return res.status(403).json({ error: "Unauthorized domain" });
+  }
+}
 
 // --- AUTO MONTHLY RESET LOGIC ---
 
