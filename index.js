@@ -8,6 +8,9 @@ const pool = require("./db");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
+const Stripe = require("stripe");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 
 const app = express();
 app.set("trust proxy", true);
@@ -910,6 +913,38 @@ app.post("/admin/create-user", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "error creating user" });
   }
+});
+
+app.post("/create-checkout", async (req, res) => {
+
+  try {
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "KIRI AI Access"
+          },
+          unit_amount: 1999, // $19.99
+        },
+        quantity: 1,
+      }],
+
+      success_url: "https://kiri-frontend.vercel.app/success.html",
+      cancel_url: "https://kiri-frontend.vercel.app/cancel.html",
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Stripe error" });
+  }
+
 });
 
 const PORT = process.env.PORT;
