@@ -925,7 +925,7 @@ app.post("/create-checkout", async (req, res) => {
 
 metadata: {
   site_key: req.body.site_key
-}
+},
 
       line_items: [{
         price_data: {
