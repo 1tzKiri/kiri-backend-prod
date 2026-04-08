@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 
   next();
 });
-
+app.use('/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.static(__dirname));
 
@@ -923,6 +923,10 @@ app.post("/create-checkout", async (req, res) => {
       payment_method_types: ["card"],
       mode: "payment",
 
+metadata: {
+  site_key: req.body.site_key
+}
+
       line_items: [{
         price_data: {
           currency: "usd",
@@ -945,6 +949,35 @@ app.post("/create-checkout", async (req, res) => {
     res.status(500).json({ error: "Stripe error" });
   }
 
+});
+
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+app.post('/webhook', require('express').raw({type: 'application/json'}), (req, res) => {
+  const sig = req.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    console.log('Webhook error:', err.message);
+    return res.sendStatus(400);
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+
+    console.log("💰 PAYMENT SUCCESS:", session);
+
+    // 👉 HERE YOU ACTIVATE USER
+    // example:
+    // find user by email or metadata
+    // update DB → plan = "pro"
+
+  }
+
+  res.json({ received: true });
 });
 
 const PORT = process.env.PORT;
