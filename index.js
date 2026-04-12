@@ -973,7 +973,7 @@ app.post('/webhook', require('express').raw({type: 'application/json'}), (req, r
   console.log("💰 PAYMENT SUCCESS:", site_key);
 
   try {
-    await db.query(
+    await pool.query(
       "UPDATE sites SET plan = 'pro' WHERE site_key = $1",
       [site_key]
     );
