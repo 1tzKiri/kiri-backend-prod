@@ -965,17 +965,25 @@ app.post('/webhook', require('express').raw({type: 'application/json'}), (req, r
     return res.sendStatus(400);
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
+ if (event.type === 'checkout.session.completed') {
+  const session = event.data.object;
 
-    console.log("💰 PAYMENT SUCCESS:", session);
+  const site_key = session.metadata.site_key;
 
-    // 👉 HERE YOU ACTIVATE USER
-    // example:
-    // find user by email or metadata
-    // update DB → plan = "pro"
+  console.log("💰 PAYMENT SUCCESS:", site_key);
 
+  try {
+    await db.query(
+      "UPDATE sites SET plan = 'pro' WHERE site_key = $1",
+      [site_key]
+    );
+
+    console.log("✅ PLAN UPDATED TO PRO");
+
+  } catch (err) {
+    console.error("❌ DB ERROR:", err);
   }
+}
 
   res.json({ received: true });
 });
