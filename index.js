@@ -953,7 +953,7 @@ metadata: {
 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-app.post('/webhook', require('express').raw({type: 'application/json'}), (req, res) => {
+app.post('/webhook', require('express').raw({type: 'application/json'}), async (req, res) => {
   const sig = req.headers['stripe-signature'];
 
   let event;
