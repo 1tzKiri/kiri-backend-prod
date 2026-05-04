@@ -27,7 +27,6 @@ app.use((req, res, next) => {
 
   next();
 });
-app.use('/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.static(__dirname));
 
@@ -956,41 +955,33 @@ app.post("/create-checkout", async (req, res) => {
 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-app.post('/webhook', require('express').raw({type: 'application/json'}), async (req, res) => {
+app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
 
   const sig = req.headers['stripe-signature'];
 
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.log('❌ Webhook error:', err.message);
     return res.sendStatus(400);
   }
 
-  // 🔥 HANDLE PAYMENT
   if (event.type === 'checkout.session.completed') {
 
     const session = event.data.object;
 
-    console.log("💰 RAW METADATA:", session.metadata);
-
     const site_key = session.metadata?.site_key;
-
-    if (!site_key) {
-      console.log("❌ NO SITE KEY FOUND");
-      return res.json({ received: true });
-    }
 
     console.log("💰 PAYMENT SUCCESS:", site_key);
 
     try {
-
-      await pool.query(
-        "UPDATE sites SET plan = 'pro' WHERE site_key = $1",
-        [site_key]
-      );
+    await pool.query(`
+  UPDATE sites
+  SET plan_id = (SELECT id FROM plans WHERE name = 'pro')
+  WHERE site_key = $1
+`, [site_key]);
 
       console.log("✅ PLAN UPDATED TO PRO");
 
@@ -1000,7 +991,6 @@ app.post('/webhook', require('express').raw({type: 'application/json'}), async (
   }
 
   res.json({ received: true });
-
 });
 
 const PORT = process.env.PORT;
