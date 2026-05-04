@@ -923,9 +923,9 @@ app.post("/create-checkout", async (req, res) => {
       payment_method_types: ["card"],
       mode: "payment",
 
-metadata: {
-  site_key: req.body.site_key
-},
+      metadata: {
+        site_key: req.body.site_key
+      },
 
       line_items: [{
         price_data: {
@@ -933,7 +933,7 @@ metadata: {
           product_data: {
             name: "KIRI AI Access"
           },
-          unit_amount: 1999, // $19.99
+          unit_amount: 1999,
         },
         quantity: 1,
       }],
@@ -945,15 +945,19 @@ metadata: {
     res.json({ url: session.url });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ STRIPE ERROR:", err);
     res.status(500).json({ error: "Stripe error" });
   }
 
 });
 
+
+// ================= WEBHOOK =================
+
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 app.post('/webhook', require('express').raw({type: 'application/json'}), async (req, res) => {
+
   const sig = req.headers['stripe-signature'];
 
   let event;
@@ -961,31 +965,42 @@ app.post('/webhook', require('express').raw({type: 'application/json'}), async (
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
   } catch (err) {
-    console.log('Webhook error:', err.message);
+    console.log('❌ Webhook error:', err.message);
     return res.sendStatus(400);
   }
 
- if (event.type === 'checkout.session.completed') {
-  const session = event.data.object;
+  // 🔥 HANDLE PAYMENT
+  if (event.type === 'checkout.session.completed') {
 
-  const site_key = session.metadata.site_key;
+    const session = event.data.object;
 
-  console.log("💰 PAYMENT SUCCESS:", site_key);
+    console.log("💰 RAW METADATA:", session.metadata);
 
-  try {
-    await pool.query(
-      "UPDATE sites SET plan = 'pro' WHERE site_key = $1",
-      [site_key]
-    );
+    const site_key = session.metadata?.site_key;
 
-    console.log("✅ PLAN UPDATED TO PRO");
+    if (!site_key) {
+      console.log("❌ NO SITE KEY FOUND");
+      return res.json({ received: true });
+    }
 
-  } catch (err) {
-    console.error("❌ DB ERROR:", err);
+    console.log("💰 PAYMENT SUCCESS:", site_key);
+
+    try {
+
+      await pool.query(
+        "UPDATE sites SET plan = 'pro' WHERE site_key = $1",
+        [site_key]
+      );
+
+      console.log("✅ PLAN UPDATED TO PRO");
+
+    } catch (err) {
+      console.error("❌ DB ERROR:", err);
+    }
   }
-}
 
   res.json({ received: true });
+
 });
 
 const PORT = process.env.PORT;
