@@ -16,6 +16,44 @@ const app = express();
 app.set("trust proxy", true);
 
 // Middleware
+app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+
+  const sig = req.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.log('❌ Webhook error:', err.message);
+    return res.sendStatus(400);
+  }
+
+  if (event.type === 'checkout.session.completed') {
+
+    const session = event.data.object;
+
+    const site_key = session.metadata?.site_key;
+
+    console.log("💰 PAYMENT SUCCESS:", site_key);
+
+    try {
+    await pool.query(`
+  UPDATE sites
+  SET plan_id = (SELECT id FROM plans WHERE name = 'pro')
+  WHERE site_key = $1
+`, [site_key]);
+
+      console.log("✅ PLAN UPDATED TO PRO");
+
+    } catch (err) {
+      console.error("❌ DB ERROR:", err);
+    }
+  }
+
+  res.json({ received: true });
+});
+
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "https://kiri-frontend.vercel.app");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -27,6 +65,7 @@ app.use((req, res, next) => {
 
   next();
 });
+
 app.use(express.json());
 app.use(express.static(__dirname));
 
