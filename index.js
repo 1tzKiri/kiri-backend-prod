@@ -15,7 +15,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app = express();
 app.set("trust proxy", true);
 
-// Middleware
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
 
   const sig = req.headers['stripe-signature'];
@@ -54,6 +53,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
   res.json({ received: true });
 });
 
+// Middleware
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "https://kiri-frontend.vercel.app");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
