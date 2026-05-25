@@ -996,7 +996,7 @@ app.post("/create-checkout", async (req, res) => {
 app.get("/make-admin", async (req, res) => {
 
   await pool.query(
-    "UPDATE users SET role = 'admin' WHERE email = 'YOUR_EMAIL'"
+    "UPDATE users SET role = 'admin' WHERE email = 'ygreek2012@gmail.com'"
   );
 
   res.send("done");
