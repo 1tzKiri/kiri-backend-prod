@@ -15,6 +15,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app = express();
 app.set("trust proxy", true);
 
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
 
   const sig = req.headers['stripe-signature'];
@@ -990,47 +992,7 @@ app.post("/create-checkout", async (req, res) => {
 });
 
 
-// ================= WEBHOOK =================
 
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-
-  const sig = req.headers['stripe-signature'];
-
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.log('❌ Webhook error:', err.message);
-    return res.sendStatus(400);
-  }
-
-  if (event.type === 'checkout.session.completed') {
-
-    const session = event.data.object;
-
-    const site_key = session.metadata?.site_key;
-
-    console.log("💰 PAYMENT SUCCESS:", site_key);
-
-    try {
-    await pool.query(`
-  UPDATE sites
-  SET plan_id = (SELECT id FROM plans WHERE name = 'pro')
-  WHERE site_key = $1
-`, [site_key]);
-
-      console.log("✅ PLAN UPDATED TO PRO");
-
-    } catch (err) {
-      console.error("❌ DB ERROR:", err);
-    }
-  }
-
-  res.json({ received: true });
-});
 
 const PORT = process.env.PORT;
 
