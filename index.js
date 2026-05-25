@@ -994,13 +994,7 @@ app.post("/create-checkout", async (req, res) => {
 });
 
 
-app.get("/debug-users", async (req, res) => {
-  const result = await pool.query(
-    "SELECT email, password, role FROM users"
-  );
 
-  res.json(result.rows);
-});
 
 
 
