@@ -904,10 +904,12 @@ app.post("/login", async (req, res) => {
     const user = result.rows[0];
 
     res.json({
-      success: true,
-      role: user.role,
-      site_key: user.site_key
-    });
+  success: true,
+  id: user.id,
+  email: user.email,
+  role: user.role,
+  site_key: user.site_key
+});
 
   } catch (err) {
     console.error(err);
