@@ -1007,7 +1007,68 @@ app.post("/create-checkout", async (req, res) => {
 
 });
 
+app.get("/widget-settings", async (req, res) => {
+  try {
+    const { site_key } = req.query;
 
+    const result = await pool.query(
+      `SELECT
+        widget_title,
+        welcome_message,
+        primary_color,
+        bot_instructions
+      FROM sites
+      WHERE site_key = $1`,
+      [site_key]
+    );
+
+    if(result.rows.length === 0){
+      return res.status(404).json({ error: "Site not found" });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/widget-settings", async (req, res) => {
+  try {
+
+    const {
+      site_key,
+      widget_title,
+      welcome_message,
+      primary_color,
+      bot_instructions
+    } = req.body;
+
+    await pool.query(
+      `UPDATE sites
+      SET
+        widget_title = $1,
+        welcome_message = $2,
+        primary_color = $3,
+        bot_instructions = $4
+      WHERE site_key = $5`,
+      [
+        widget_title,
+        welcome_message,
+        primary_color,
+        bot_instructions,
+        site_key
+      ]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 
