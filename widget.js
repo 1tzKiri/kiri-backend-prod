@@ -4,67 +4,96 @@ const SITE_KEY = currentScript.getAttribute("data-site-key");
 (function () {
   if (document.getElementById("kiri-launcher")) return;
 
-  // ✅ Launcher Button (K)
+  const FRONTEND_URL = "https://kiri-frontend.vercel.app";
+
   const button = document.createElement("div");
   button.id = "kiri-launcher";
-  button.innerText = "K";
+  button.innerHTML = "✦";
 
   Object.assign(button.style, {
     position: "fixed",
-    bottom: "20px",
-    right: "20px",
-    width: "56px",
-    height: "56px",
-    borderRadius: "50%",
-    background: "#1a1a1a",
+    bottom: "24px",
+    right: "24px",
+    width: "60px",
+    height: "60px",
+    borderRadius: "20px",
+    background: "linear-gradient(135deg,#2563eb,#22c55e,#a855f7)",
     color: "#ffffff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontWeight: "bold",
-    fontSize: "18px",
+    fontWeight: "900",
+    fontSize: "24px",
     cursor: "pointer",
-    zIndex: "999999",
-    boxShadow: "0 10px 30px rgba(0,0,0,.4)"
+    zIndex: "2147483647",
+    boxShadow: "0 20px 60px rgba(0,0,0,.45)",
+    transition: "transform .2s ease, opacity .2s ease"
   });
 
-  // ✅ Chat iframe (hidden by default)
+  button.onmouseenter = () => {
+    button.style.transform = "translateY(-3px) scale(1.03)";
+  };
+
+  button.onmouseleave = () => {
+    button.style.transform = "translateY(0) scale(1)";
+  };
+
   const iframe = document.createElement("iframe");
-  iframe.src =
-   "https://kiri-frontend.vercel.app/chat.html?siteKey=" + SITE_KEY;
+  iframe.id = "kiri-widget-frame";
+  iframe.src = FRONTEND_URL + "/chat.html?siteKey=" + encodeURIComponent(SITE_KEY);
+
   Object.assign(iframe.style, {
     position: "fixed",
-    bottom: "90px",
-    right: "20px",
-    width: "360px",
-    height: "520px",
+    bottom: "96px",
+    right: "24px",
+    width: "380px",
+    height: "620px",
+    maxWidth: "calc(100vw - 32px)",
+    maxHeight: "calc(100vh - 120px)",
     border: "none",
-    borderRadius: "18px",
-    boxShadow: "0 30px 70px rgba(0,0,0,0.4)",
-    display: "none", // important
-    zIndex: "999998"
+    borderRadius: "22px",
+    boxShadow: "0 30px 90px rgba(0,0,0,0.55)",
+    display: "none",
+    zIndex: "2147483646",
+    overflow: "hidden",
+    background: "transparent"
   });
 
   document.body.appendChild(button);
   document.body.appendChild(iframe);
 
-  // ✅ Open
   button.onclick = () => {
     button.style.display = "none";
     iframe.style.display = "block";
   };
 
-  // ✅ Close
   window.addEventListener("message", (event) => {
-    if (
-      event.origin !==
-      "https://kiri-backend-prod-production.up.railway.app"
-    )
-      return;
+    if (event.origin !== FRONTEND_URL) return;
 
     if (event.data === "kiri-close") {
       iframe.style.display = "none";
       button.style.display = "flex";
     }
   });
+
+  const mobileStyles = () => {
+    if (window.innerWidth <= 520) {
+      iframe.style.right = "12px";
+      iframe.style.bottom = "12px";
+      iframe.style.width = "calc(100vw - 24px)";
+      iframe.style.height = "calc(100vh - 24px)";
+      iframe.style.maxHeight = "calc(100vh - 24px)";
+      iframe.style.borderRadius = "20px";
+    } else {
+      iframe.style.right = "24px";
+      iframe.style.bottom = "96px";
+      iframe.style.width = "380px";
+      iframe.style.height = "620px";
+      iframe.style.maxHeight = "calc(100vh - 120px)";
+      iframe.style.borderRadius = "22px";
+    }
+  };
+
+  mobileStyles();
+  window.addEventListener("resize", mobileStyles);
 })();
