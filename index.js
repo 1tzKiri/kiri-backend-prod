@@ -861,24 +861,29 @@ app.post("/register", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // create user
-    await pool.query(
-      "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user')",
+    const userResult = await pool.query(
+      "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user') RETURNING id, email, role",
       [email, password]
     );
 
-    // generate site key
+    const newUser = userResult.rows[0];
     const siteKey = Math.random().toString(36).substring(2, 12);
 
-    // create site (NO user_id)
     await pool.query(
-      "INSERT INTO sites (name, site_key, active) VALUES ($1, $2, true)",
-      ["New Site", siteKey]
+      "INSERT INTO sites (user_id, name, site_key, active) VALUES ($1, $2, $3, true)",
+      [newUser.id, "New Site", siteKey]
     );
 
-    // return site key
+    await pool.query(
+      "UPDATE users SET site_key = $1 WHERE id = $2",
+      [siteKey, newUser.id]
+    );
+
     res.json({
       success: true,
+      id: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
       site_key: siteKey
     });
 
@@ -921,9 +926,18 @@ app.get("/conversations", async (req, res) => {
   try {
     const { site_key } = req.query;
 
-    const result = await pool.query(
-      "SELECT * FROM conversations WHERE site_key = $1 ORDER BY id DESC",
+    const site = await pool.query(
+      "SELECT id FROM sites WHERE site_key = $1",
       [site_key]
+    );
+
+    if (site.rows.length === 0) {
+      return res.status(404).json({ error: "Site not found" });
+    }
+
+    const result = await pool.query(
+      "SELECT * FROM conversations WHERE site_id = $1 ORDER BY id DESC",
+      [site.rows[0].id]
     );
 
     res.json(result.rows);
