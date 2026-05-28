@@ -1,220 +1,213 @@
 global.File = class {};
+
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const { OpenAI } = require("openai");
-const pool = require("./db");
-const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+const rateLimit = require("express-rate-limit");
 const Stripe = require("stripe");
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const { OpenAI } = require("openai");
 
+const pool = require("./db");
 
 const app = express();
 app.set("trust proxy", true);
 
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
-app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
-  const sig = req.headers['stripe-signature'];
+const FRONTEND_URL = "https://kiri-frontend.vercel.app";
 
-  let event;
+// STRIPE WEBHOOK MUST BE BEFORE express.json()
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const sig = req.headers["stripe-signature"];
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.log('❌ Webhook error:', err.message);
-    return res.sendStatus(400);
-  }
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
 
-  if (event.type === 'checkout.session.completed') {
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const site_key = session.metadata?.site_key;
 
-    const session = event.data.object;
+      if (site_key) {
+        await pool.query(
+          `
+          UPDATE sites
+          SET plan_id = (SELECT id FROM plans WHERE LOWER(name) = 'pro')
+          WHERE site_key = $1
+          `,
+          [site_key]
+        );
 
-    const site_key = session.metadata?.site_key;
-
-    console.log("💰 PAYMENT SUCCESS:", site_key);
-
-    try {
-    await pool.query(`
-  UPDATE sites
-  SET plan_id = (SELECT id FROM plans WHERE name = 'pro')
-  WHERE site_key = $1
-`, [site_key]);
-
-      console.log("✅ PLAN UPDATED TO PRO");
-
-    } catch (err) {
-      console.error("❌ DB ERROR:", err);
+        console.log("✅ Stripe payment success. Plan upgraded:", site_key);
+      }
     }
-  }
 
-  res.json({ received: true });
+    res.json({ received: true });
+  } catch (err) {
+    console.log("❌ Webhook error:", err.message);
+    res.sendStatus(400);
+  }
 });
 
-// Middleware
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "https://kiri-frontend.vercel.app");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-
-  next();
-});
+// MIDDLEWARE
+app.use(cors({
+  origin: FRONTEND_URL,
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "x-admin-secret"]
+}));
 
 app.use(express.json());
 app.use(express.static(__dirname));
 
 const askLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false
 });
 
-// OpenAI client
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// HELPERS
+function verifyAdmin(req, res, next) {
+  const adminKey = req.headers["x-admin-secret"];
 
-// Serve UI
+  if (!ADMIN_SECRET || adminKey !== ADMIN_SECRET) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  next();
+}
+
+async function getSiteByKey(site_key) {
+  const result = await pool.query(
+    `
+    SELECT 
+      s.*,
+      p.name AS plan_name,
+      p.monthly_limit
+    FROM sites s
+    LEFT JOIN plans p ON s.plan_id = p.id
+    WHERE LOWER(s.site_key) = LOWER($1)
+    `,
+    [site_key]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function checkConversationAccess(conversationId, site_key) {
+  const result = await pool.query(
+    `
+    SELECT c.id
+    FROM conversations c
+    JOIN sites s ON c.site_id = s.id
+    WHERE c.id = $1
+    AND s.site_key = $2
+    `,
+    [conversationId, site_key]
+  );
+
+  return result.rows.length > 0;
+}
+
+// ROOT
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "chat.html"));
 });
 
-// Chat endpoint
-app.post("/ask", async (req, res) => {
+// ASK / WIDGET CHAT
+app.post("/ask", askLimiter, async (req, res) => {
   try {
-const { message, conversationId, site_key } = req.body;
+    const { message, conversationId, site_key, language } = req.body;
 
-// 🔥 DEBUG
-console.log("SITE_KEY:", site_key);
+    if (!site_key) return res.status(400).json({ error: "Missing site key" });
+    if (!message) return res.status(400).json({ error: "Missing message" });
 
-if (!site_key) {
-  return res.status(400).json({ error: "Missing site key" });
-}
+    const site = await getSiteByKey(site_key);
 
-if (!message) {
-  return res.status(400).json({ error: "Missing message" });
-}
+    if (!site) {
+      return res.status(403).json({ error: "Invalid site key" });
+    }
 
-console.log("ALL SITES TEST:");
-const test = await pool.query("SELECT site_key FROM sites");
-console.log(test.rows);
+    // Domain validation
+    const origin = req.headers.origin;
 
-const result = await pool.query(  
-`SELECT sites.*, plans.monthly_limit
-   FROM sites
-   LEFT JOIN plans ON sites.plan_id = plans.id
-   WHERE LOWER(sites.site_key) = LOWER($1)`,
-  [site_key]
-);
+    if (origin && site.allowed_domain) {
+      const requestDomain = origin.replace(/^https?:\/\//, "").split("/")[0];
 
-// 🔥 DEBUG
-console.log("DB RESULT:", result.rows);
+      if (!requestDomain.endsWith(site.allowed_domain)) {
+        return res.status(403).json({ error: "Unauthorized domain" });
+      }
+    }
 
-if (result.rows.length === 0) {
-  return res.status(403).json({ error: "Invalid site key" });
-}
+    // monthly reset
+    const now = new Date();
+    const lastReset = site.last_reset_at ? new Date(site.last_reset_at) : new Date(0);
 
-const site = result.rows[0];
-const knowledge = await pool.query(
-  "SELECT content FROM knowledge_chunks WHERE site_id = $1 LIMIT 5",
-  [site.id]
-);
+    if (
+      now.getMonth() !== lastReset.getMonth() ||
+      now.getFullYear() !== lastReset.getFullYear()
+    ) {
+      await pool.query(
+        `
+        UPDATE sites
+        SET monthly_message_count = 0,
+            last_reset_at = NOW()
+        WHERE id = $1
+        `,
+        [site.id]
+      );
 
-const knowledgeText = knowledge.rows.map(r => r.content).join("\n\n");
+      site.monthly_message_count = 0;
+    }
 
-// 🔥 DOMAIN DEBUG
-const origin = req.headers.origin;
+    const monthlyLimit = site.monthly_limit || 10;
 
-console.log("ORIGIN:", origin);
-console.log("ALLOWED DOMAIN:", site.allowed_domain);
-
-// ✅ CLEAN DOMAIN VALIDATION
-if (origin && site.allowed_domain) {
-  const requestDomain = origin
-    .replace(/^https?:\/\//, "")
-    .split("/")[0];
-
-  if (!requestDomain.endsWith(site.allowed_domain)) {
-    return res.status(403).json({ error: "Unauthorized domain" });
-  }
-}
-
-// --- AUTO MONTHLY RESET LOGIC ---
-
-const now = new Date();
-const lastReset = new Date(site.last_reset_at);
-
-const currentMonth = now.getMonth();
-const currentYear = now.getFullYear();
-
-const resetMonth = lastReset.getMonth();
-const resetYear = lastReset.getFullYear();
-
-// If new month started → reset counter
-if (currentMonth !== resetMonth || currentYear !== resetYear) {
-  await pool.query(
-    `UPDATE sites
-     SET monthly_message_count = 0,
-         last_reset_at = NOW()
-     WHERE id = $1`,
-    [site.id]
-  );
-
-  site.monthly_message_count = 0;
-}
-
-
-const plan = site.plan || "free";
-
-// 🔥 Tier-based rate limiting per site_key
-const limits = {
-  free: 10,
-  pro: 100,
-  enterprise: 1000
-};
-
-const limit = limits[plan] || 10;
-
-const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
-
-const rateResult = await pool.query(
-  `
-  SELECT COUNT(*)
-  FROM messages m
-  JOIN conversations c ON m.conversation_id = c.id
-  WHERE c.site_id = $1
-  AND m.role = 'user'
-  AND m.created_at > $2
-  `,
-  [site.id, oneMinuteAgo]
-);
-const requestCount = parseInt(rateResult.rows[0].count);
-
-if (requestCount >= limit) {
-  return res.status(429).json({
-    error: "Rate limit exceeded for your plan."
-  });
-}
-   
-   
-
-    // Check monthly limit
-    if (site.monthly_message_count >= site.monthly_limit) {
+    if (site.monthly_message_count >= monthlyLimit) {
       return res.status(403).json({ error: "Monthly message limit reached" });
+    }
+
+    // rate limit by plan
+    const planName = (site.plan_name || "free").toLowerCase();
+
+    const limits = {
+      free: 10,
+      pro: 100,
+      enterprise: 1000
+    };
+
+    const perMinuteLimit = limits[planName] || 10;
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+
+    const rateResult = await pool.query(
+      `
+      SELECT COUNT(*)
+      FROM messages m
+      JOIN conversations c ON m.conversation_id = c.id
+      WHERE c.site_id = $1
+      AND m.role = 'user'
+      AND m.created_at > $2
+      `,
+      [site.id, oneMinuteAgo]
+    );
+
+    if (parseInt(rateResult.rows[0].count) >= perMinuteLimit) {
+      return res.status(429).json({ error: "Rate limit exceeded for your plan." });
     }
 
     let convoId = conversationId || null;
 
-    // Create new conversation if needed
+    // create new conversation
     if (!convoId) {
       const convo = await pool.query(
         "INSERT INTO conversations (site_id) VALUES ($1) RETURNING id",
@@ -224,69 +217,104 @@ if (requestCount >= limit) {
       convoId = convo.rows[0].id;
 
       await pool.query(
-        "UPDATE sites SET total_conversations = total_conversations + 1 WHERE id = $1",
+        "UPDATE sites SET total_conversations = COALESCE(total_conversations,0) + 1 WHERE id = $1",
         [site.id]
       );
-     }
+    }
 
-const takeoverCheck = await pool.query(
-  "SELECT human_takeover FROM conversations WHERE id = $1",
-  [convoId]
-);
+    // verify conversation belongs to site
+    const allowed = await checkConversationAccess(convoId, site_key);
 
-const msg = message.toLowerCase();
+    if (!allowed) {
+      return res.status(403).json({ error: "Unauthorized conversation" });
+    }
 
-if (takeoverCheck.rows[0]?.human_takeover) {
-
-  if (
-    msg.includes("return to ai") ||
-    msg.includes("back to ai") ||
-    msg.includes("cancel human") ||
-    msg.includes("use ai")
-  ) {
-
-    await pool.query(
-      "UPDATE conversations SET human_takeover = false WHERE id = $1",
+    const convoResult = await pool.query(
+      "SELECT human_takeover FROM conversations WHERE id = $1",
       [convoId]
     );
 
-  } else {
+    const isHumanTakeover = convoResult.rows[0]?.human_takeover === true;
 
-    return res.json({
-      reply: "A human agent will continue this conversation shortly."
-    });
-
-  }
-
-}
-
-    // Save user message
+    // always save user message
     await pool.query(
-      "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-      [convoId, "user", message]
+      "INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)",
+      [convoId, message]
     );
 
-    // Get last messages
+    // if already in human takeover, AI must NOT answer
+    if (isHumanTakeover) {
+      return res.json({
+        reply: null,
+        human_takeover: true,
+        conversationId: convoId
+      });
+    }
+
+    const msg = message.toLowerCase();
+
+    const humanTriggers = [
+      "human",
+      "agent",
+      "support",
+      "real person",
+      "talk to human",
+      "customer service",
+      "talk to a person",
+      "person",
+      "człowiek",
+      "konsultant",
+      "pomoc"
+    ];
+
+    const wantsHuman = humanTriggers.some(trigger => msg.includes(trigger));
+
+    if (wantsHuman) {
+      await pool.query(
+        "UPDATE conversations SET human_takeover = true WHERE id = $1",
+        [convoId]
+      );
+
+      const humanReply = "Sure — a human agent will join the conversation shortly.";
+
+      await pool.query(
+        "INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'assistant', $2)",
+        [convoId, humanReply]
+      );
+
+      return res.json({
+        reply: humanReply,
+        human_takeover: true,
+        conversationId: convoId
+      });
+    }
+
+    const knowledge = await pool.query(
+      "SELECT content FROM knowledge_chunks WHERE site_id = $1 LIMIT 8",
+      [site.id]
+    );
+
+    const knowledgeText = knowledge.rows.map(r => r.content).join("\n\n");
+
     const historyResult = await pool.query(
       `
-     SELECT role, content
-FROM messages
-WHERE conversation_id = $1
-ORDER BY created_at DESC
-LIMIT 10
+      SELECT role, content
+      FROM messages
+      WHERE conversation_id = $1
+      ORDER BY created_at DESC
+      LIMIT 10
       `,
       [convoId]
     );
 
-  const messagesForAI = historyResult.rows
-  .reverse()
-  .map(m => ({
-    role: m.role,
-    content: m.content
-  }));
+    const history = historyResult.rows.reverse();
 
-const systemPrompt = `
-You are KIRI AI, a focused technical assistant embedded on a website.
+    const conversationText = history
+      .map(m => `${m.role.toUpperCase()}: ${m.content}`)
+      .join("\n");
+
+    const systemPrompt = `
+You are Kiri AI, a focused assistant embedded on a website.
 
 Website knowledge:
 ${knowledgeText}
@@ -297,83 +325,47 @@ Rules:
 - If the user writes in German, respond in German.
 - Otherwise respond in English.
 - Answer directly and cleanly.
+- Be concise.
 - Do not add unnecessary greetings.
-- Be concise and structured.
 `;
 
-const humanTriggers = [
-  "human",
-  "agent",
-  "support",
-  "real person",
-  "talk to human",
-  "customer service",
-  "talk to a person"
-];
-
-const wantsHuman = humanTriggers.some(trigger =>
-  message.toLowerCase().includes(trigger)
-);
-
-if (wantsHuman) {
-  await pool.query(
-    "UPDATE conversations SET human_takeover = true WHERE id = $1",
-    [convoId]
-  );
-
-  const humanReply = "Sure — a human agent will join the conversation shortly.";
-
-  await pool.query(
-    "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-    [convoId, "assistant", humanReply]
-  );
-
-  return res.json({
-    reply: humanReply,
-    conversationId: convoId
-  });
-}
-
-const lastMessages = messagesForAI.slice(-10);
-
-const conversationText = lastMessages
-  .map(m => `${m.role.toUpperCase()}: ${m.content}`)
-  .join("\n");
-
-const response = await client.responses.create({
-  model: "gpt-4.1-mini",
-  input: `${systemPrompt}
+    const response = await client.responses.create({
+      model: "gpt-4.1-mini",
+      input: `${systemPrompt}
 
 Conversation so far:
 ${conversationText}
 
 Assistant:`,
-  temperature: 0.4,
-  max_output_tokens: 300
-});
+      temperature: 0.4,
+      max_output_tokens: 300
+    });
+
     const reply =
       response.output_text ||
       response.output?.[0]?.content?.[0]?.text ||
       "No response";
 
-    // Save assistant message
     await pool.query(
-      "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-      [convoId, "assistant", reply]
+      "INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'assistant', $2)",
+      [convoId, reply]
     );
 
-    // Update usage counters
     await pool.query(
       `
       UPDATE sites
-      SET total_messages = total_messages + 1,
-          monthly_message_count = monthly_message_count + 1
+      SET total_messages = COALESCE(total_messages,0) + 1,
+          monthly_message_count = COALESCE(monthly_message_count,0) + 1
       WHERE id = $1
       `,
       [site.id]
     );
 
-    res.json({ reply, conversationId: convoId });
+    res.json({
+      reply,
+      human_takeover: false,
+      conversationId: convoId
+    });
 
   } catch (err) {
     console.error("ASK ERROR:", err);
@@ -381,521 +373,47 @@ Assistant:`,
   }
 });
 
-app.post("/create-site", async (req, res) => {
+// AUTH
+app.post("/register", async (req, res) => {
   try {
-    const { name, domain, plan } = req.body;
+    const { email, password } = req.body;
 
-    if (!name || !domain || !plan) {
+    if (!email || !password) {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    // Find plan in DB
-    const planResult = await pool.query(
-      "SELECT * FROM plans WHERE name = $1",
-      [plan]
-    );
-
-    if (planResult.rows.length === 0) {
-      return res.status(400).json({ error: "Invalid plan" });
-    }
-
-    const planData = planResult.rows[0];
-
-    // Generate site key
-    const siteKey = require("crypto").randomBytes(16).toString("hex");
-
-    // Insert new site
-    await pool.query(
-      `INSERT INTO sites (name, domain, site_key, plan_id)
-       VALUES ($1, $2, $3, $4)`,
-      [name, domain, siteKey, planData.id]
-    );
-
-    const embed = `<script src="https://kiri-backend-prod-production.up.railway.app/widget.js" data-site-key="${siteKey}"></script>`;
-
-    res.json({ siteKey, embed });
-
-  } catch (err) {
-    console.error("Create site error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/upgrade-plan", async (req, res) => {
-  const { siteKey, newPlan } = req.body;
-
-  if (!siteKey || !newPlan) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  // Find plan
-  const planResult = await pool.query(
-    "SELECT * FROM plans WHERE name = $1",
-    [newPlan]
-  );
-
-  if (planResult.rows.length === 0) {
-    return res.status(400).json({ error: "Invalid plan" });
-  }
-
-  const planId = planResult.rows[0].id;
-
-  // Update site
-  const updateResult = await pool.query(
-    "UPDATE sites SET plan_id = $1 WHERE site_key = $2 RETURNING *",
-    [planId, siteKey]
-  );
-
-  if (updateResult.rows.length === 0) {
-    return res.status(404).json({ error: "Site not found" });
-  }
-
-  res.json({ message: "Plan upgraded successfully" });
-});
-
-app.post("/site-usage", async (req, res) => {
-  const { siteKey } = req.body;
-
-  if (!siteKey) {
-    return res.status(400).json({ error: "Missing site key" });
-  }
-
-  // Get site with plan info
-  const result = await pool.query(
-    `
-    SELECT 
-      s.id,
-      s.name,
-      s.monthly_message_count,
-      s.last_reset_at,
-      p.name AS plan_name,
-      p.monthly_limit,
-      p.price
-    FROM sites s
-    JOIN plans p ON s.plan_id = p.id
-    WHERE s.site_key = $1
-    `,
-    [siteKey]
-  );
-
-  if (result.rows.length === 0) {
-    return res.status(404).json({ error: "Site not found" });
-  }
-
-  const site = result.rows[0];
-
-  const remaining = site.monthly_limit - site.monthly_message_count;
-
-  res.json({
-    name: site.name,
-    plan: site.plan_name,
-    monthlyUsed: site.monthly_message_count,
-    monthlyLimit: site.monthly_limit,
-    remaining,
-    price: site.price,
-    lastReset: site.last_reset_at
-  });
-});
-
-function verifyAdmin(req, res, next) {
-  const adminKey = req.headers["x-admin-secret"];
-
-  if (!adminKey || adminKey !== ADMIN_SECRET) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
-
-  next();
-}
-
-app.get("/admin-overview", verifyAdmin, async (req, res) => {
-  try {
-    // Get all sites with plan info
-    const result = await pool.query(`
-      SELECT 
-        s.id,
-        s.name,
-        s.monthly_message_count,
-        s.site_key,
-        p.name AS plan_name,
-        p.monthly_limit,
-        p.price
-      FROM sites s
-      JOIN plans p ON s.plan_id = p.id
-      ORDER BY s.id DESC
-    `);
-
-    const sites = result.rows;
-
-    const totalSites = sites.length;
-
-    const totalMonthlyRevenue = sites.reduce((sum, site) => {
-      return sum + parseFloat(site.price);
-    }, 0);
-
-    res.json({
-      totalSites,
-      totalMonthlyRevenue,
-      sites
-    });
-
-  } catch (err) {
-    console.error("Admin overview error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/admin-update-plan", verifyAdmin, async (req, res) => {
-  const { siteId, newPlanName } = req.body;
-
-  if (!siteId || !newPlanName) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  try {
-    const planResult = await pool.query(
-      "SELECT * FROM plans WHERE name = $1",
-      [newPlanName]
-    );
-
-    if (planResult.rows.length === 0) {
-      return res.status(400).json({ error: "Invalid plan" });
-    }
-
-    const plan = planResult.rows[0];
-
-    await pool.query(
-      "UPDATE sites SET plan_id = $1 WHERE id = $2",
-      [plan.id, siteId]
-    );
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/admin-delete-site", verifyAdmin, async (req, res) => {
-  const { siteId } = req.body;
-
-  if (!siteId) {
-    return res.status(400).json({ error: "Missing siteId" });
-  }
-
-  try {
-    await pool.query("DELETE FROM sites WHERE id = $1", [siteId]);
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.get("/admin-conversations/:siteId", verifyAdmin, async (req, res) => {
-  const { siteId } = req.params;
-
-  try {
-    const result = await pool.query(`
-      SELECT 
-        c.id as conversation_id,
-        c.created_at,
-        m.role,
-        m.content,
-        m.created_at as message_time
-      FROM conversations c
-      JOIN messages m ON m.conversation_id = c.id
-      WHERE c.site_id = $1
-      ORDER BY m.created_at ASC
-    `, [siteId]);
-
-    res.json({ messages: result.rows });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/admin-scrape-site", verifyAdmin, async (req, res) => {
-  const { siteId, url } = req.body;
-
-  try {
-    const axios = require("axios");
-    const cheerio = require("cheerio");
-
-    const visited = new Set();
-    const toVisit = [url];
-
-    const baseDomain = new URL(url).hostname;
-
-    let allText = "";
-
-    while (toVisit.length > 0 && visited.size < 15) {
-
-      const currentUrl = toVisit.shift();
-
-      if (visited.has(currentUrl)) continue;
-
-      visited.add(currentUrl);
-
-      try {
-
-        const response = await axios.get(currentUrl, { timeout: 10000 });
-
-        const html = response.data;
-
-        const $ = cheerio.load(html);
-
-        $("p, h1, h2, h3, li").each((i, el) => {
-          const text = $(el).text().trim();
-          if (text.length > 30) {
-            allText += text + "\n";
-          }
-        });
-
-        $("a").each((i, el) => {
-
-          const link = $(el).attr("href");
-
-          if (!link) return;
-
-          let full;
-
-          if (link.startsWith("http")) {
-            full = link;
-          } else if (link.startsWith("/")) {
-            full = new URL(link, url).href;
-          } else {
-            return;
-          }
-
-          try {
-
-            const hostname = new URL(full).hostname;
-
-            if (hostname === baseDomain && !visited.has(full)) {
-              toVisit.push(full);
-            }
-
-          } catch {}
-
-        });
-
-      } catch {
-        console.log("skip:", currentUrl);
-      }
-
-    }
-
-    // remove old knowledge
-    await pool.query(
-      "DELETE FROM knowledge_chunks WHERE site_id = $1",
-      [siteId]
-    );
-
-    // split into chunks
-    const chunks = allText.match(/.{1,1200}/gs) || [];
-
-    for (const chunk of chunks) {
-
-      await pool.query(
-        "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
-        [siteId, chunk]
-      );
-
-    }
-
-    res.json({
-      success: true,
-      pages_scraped: visited.size,
-      chunks_created: chunks.length
-    });
-
-  } catch (err) {
-
-    console.error("Scrape error:", err);
-
-    res.status(500).json({
-      error: "Scrape failed"
-    });
-
-  }
-
-});
-
-app.post("/admin/takeover", verifyAdmin, async (req, res) => {
-  const { conversationId } = req.body;
-
-  if (!conversationId) {
-    return res.status(400).json({ error: "Missing conversationId" });
-  }
-
-  await pool.query(
-    "UPDATE conversations SET human_takeover = true WHERE id = $1",
-    [conversationId]
-  );
-
-  res.json({ success: true });
-});
-
-app.get("/admin/conversations", async (req, res) => {
-  const result = await pool.query(`
-    SELECT conversations.id, conversations.created_at, sites.domain
-    FROM conversations
-    JOIN sites ON conversations.site_id = sites.id
-    ORDER BY conversations.created_at DESC
-    LIMIT 50
-  `);
-
-  res.json(result.rows);
-});
-
-app.get("/admin/messages/:conversationId", async (req, res) => {
-
-  const { conversationId } = req.params;
-
-  const messages = await pool.query(
-    "SELECT role, content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC",
-    [conversationId]
-  );
-
-  res.json(messages.rows);
-
-});
-
-app.post("/admin/reply", async (req, res) => {
-
-  const { conversationId, message } = req.body;
-
-  await pool.query(
-    "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-    [conversationId, "assistant", message]
-  );
-
-  res.json({ success: true });
-
-});
-
-app.post("/admin/return-to-ai", async (req, res) => {
-
-  const { conversationId } = req.body;
-
-  try {
-
-    await pool.query(
-      "UPDATE conversations SET human_takeover = false WHERE id = $1",
-      [conversationId]
-    );
-
-    res.json({ success: true });
-
-  } catch (err) {
-
-    console.error("Return to AI error:", err);
-    res.status(500).json({ error: "Failed to return to AI" });
-
-  }
-
-});
-
-app.post("/admin/return-to-ai", async (req, res) => {
-
-  const { conversationId } = req.body;
-
-  if (!conversationId) {
-    return res.status(400).json({ error: "Missing conversationId" });
-  }
-
-  try {
-
-    await pool.query(
-      "UPDATE conversations SET human_takeover = false WHERE id = $1",
-      [conversationId]
-    );
-
-    res.json({ success: true });
-
-  } catch (err) {
-
-    console.error("Return to AI error:", err);
-    res.status(500).json({ error: "Failed to return to AI" });
-
-  }
-
-});
-
-app.get("/admin/conversations", async (req, res) => {
-  const result = await pool.query(`
-    SELECT conversations.id, conversations.created_at, conversations.human_takeover, sites.domain
-    FROM conversations
-    JOIN sites ON conversations.site_id = sites.id
-    ORDER BY conversations.created_at DESC
-  `);
-
-  res.json(result.rows);
-});
-
-app.get("/admin/messages/:id", async (req, res) => {
-  const { id } = req.params;
-
-  const result = await pool.query(
-    "SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC",
-    [id]
-  );
-
-  res.json(result.rows);
-});
-
-app.post("/admin/reply", async (req, res) => {
-  const { conversationId, message } = req.body;
-
-  if (!conversationId || !message) {
-    return res.status(400).json({ error: "Missing data" });
-  }
-
-  await pool.query(
-    "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
-    [conversationId, "human", message]
-  );
-
-  res.json({ success: true });
-});
-
-
-app.post("/register", async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
     const userResult = await pool.query(
       "INSERT INTO users (email, password, role) VALUES ($1, $2, 'user') RETURNING id, email, role",
       [email, password]
     );
 
-    const newUser = userResult.rows[0];
-    const siteKey = Math.random().toString(36).substring(2, 12);
+    const user = userResult.rows[0];
+    const siteKey = crypto.randomBytes(12).toString("hex");
 
     await pool.query(
-      "INSERT INTO sites (user_id, name, site_key, active) VALUES ($1, $2, $3, true)",
-      [newUser.id, "New Site", siteKey]
+      `
+      INSERT INTO sites (user_id, name, site_key, active)
+      VALUES ($1, $2, $3, true)
+      `,
+      [user.id, "New Site", siteKey]
     );
 
     await pool.query(
       "UPDATE users SET site_key = $1 WHERE id = $2",
-      [siteKey, newUser.id]
+      [siteKey, user.id]
     );
 
     res.json({
       success: true,
-      id: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
+      id: user.id,
+      email: user.email,
+      role: user.role,
       site_key: siteKey
     });
 
   } catch (err) {
-    console.log("REGISTER ERROR:", err);
-    res.status(500).json({ error: "fail" });
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({ error: "Register failed" });
   }
 });
 
@@ -915,15 +433,65 @@ app.post("/login", async (req, res) => {
     const user = result.rows[0];
 
     res.json({
-  success: true,
-  id: user.id,
-  email: user.email,
-  role: user.role,
-  site_key: user.site_key
-});
+      success: true,
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      site_key: user.site_key
+    });
 
   } catch (err) {
-    console.error(err);
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// CLIENT DATA
+app.post("/site-usage", async (req, res) => {
+  try {
+    const { siteKey } = req.body;
+
+    if (!siteKey) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT 
+        s.id,
+        s.name,
+        s.monthly_message_count,
+        s.last_reset_at,
+        p.name AS plan_name,
+        p.monthly_limit,
+        p.price
+      FROM sites s
+      LEFT JOIN plans p ON s.plan_id = p.id
+      WHERE s.site_key = $1
+      `,
+      [siteKey]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Site not found" });
+    }
+
+    const site = result.rows[0];
+    const limit = site.monthly_limit || 10;
+    const used = site.monthly_message_count || 0;
+
+    res.json({
+      name: site.name,
+      plan: site.plan_name || "free",
+      monthlyUsed: used,
+      monthlyLimit: limit,
+      remaining: limit - used,
+      price: site.price,
+      lastReset: site.last_reset_at
+    });
+
+  } catch (err) {
+    console.error("SITE USAGE ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -932,146 +500,30 @@ app.get("/conversations", async (req, res) => {
   try {
     const { site_key } = req.query;
 
-    const site = await pool.query(
-      "SELECT id FROM sites WHERE site_key = $1",
-      [site_key]
-    );
+    if (!site_key) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
 
-    if (site.rows.length === 0) {
+    const site = await getSiteByKey(site_key);
+
+    if (!site) {
       return res.status(404).json({ error: "Site not found" });
     }
 
     const result = await pool.query(
-      "SELECT * FROM conversations WHERE site_id = $1 ORDER BY created_at DESC",
-      [site.rows[0].id]
+      `
+      SELECT *
+      FROM conversations
+      WHERE site_id = $1
+      ORDER BY created_at DESC
+      `,
+      [site.id]
     );
 
     res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/admin/create-user", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const site_key = Math.random().toString(36).substring(2, 10);
-
-    await pool.query(
-      "INSERT INTO users (email, password, role, site_key) VALUES ($1, $2, $3, $4)",
-      [email, password, "user", site_key]
-    );
-
-  await pool.query(
-  "INSERT INTO sites (name, site_key) VALUES ($1, $2)",
-  ["New Client", site_key]
-);
-
-    res.json({ success: true, site_key });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "error creating user" });
-  }
-});
-
-app.post("/create-checkout", async (req, res) => {
-
-  try {
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "payment",
-
-      metadata: {
-        site_key: req.body.site_key
-      },
-
-      line_items: [{
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: "KIRI AI Access"
-          },
-          unit_amount: 1999,
-        },
-        quantity: 1,
-      }],
-
-      success_url: "https://kiri-frontend.vercel.app/success.html",
-      cancel_url: "https://kiri-frontend.vercel.app/cancel.html",
-    });
-
-    res.json({ url: session.url });
-
-  } catch (err) {
-    console.error("❌ STRIPE ERROR:", err);
-    res.status(500).json({ error: "Stripe error" });
-  }
-
-});
-
-app.get("/widget-settings", async (req, res) => {
-  try {
-    const { site_key } = req.query;
-
-    const result = await pool.query(
-      `SELECT
-        widget_title,
-        welcome_message,
-        primary_color,
-        bot_instructions
-      FROM sites
-      WHERE site_key = $1`,
-      [site_key]
-    );
-
-    if(result.rows.length === 0){
-      return res.status(404).json({ error: "Site not found" });
-    }
-
-    res.json(result.rows[0]);
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/widget-settings", async (req, res) => {
-  try {
-
-    const {
-      site_key,
-      widget_title,
-      welcome_message,
-      primary_color,
-      bot_instructions
-    } = req.body;
-
-    await pool.query(
-      `UPDATE sites
-      SET
-        widget_title = $1,
-        welcome_message = $2,
-        primary_color = $3,
-        bot_instructions = $4
-      WHERE site_key = $5`,
-      [
-        widget_title,
-        welcome_message,
-        primary_color,
-        bot_instructions,
-        site_key
-      ]
-    );
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.log(err);
+    console.error("CONVERSATIONS ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1085,18 +537,9 @@ app.get("/messages/:conversationId", async (req, res) => {
       return res.status(400).json({ error: "Missing site key" });
     }
 
-    const check = await pool.query(
-      `
-      SELECT c.id
-      FROM conversations c
-      JOIN sites s ON c.site_id = s.id
-      WHERE c.id = $1
-      AND s.site_key = $2
-      `,
-      [conversationId, site_key]
-    );
+    const allowed = await checkConversationAccess(conversationId, site_key);
 
-    if (check.rows.length === 0) {
+    if (!allowed) {
       return res.status(403).json({ error: "Unauthorized conversation" });
     }
 
@@ -1113,7 +556,7 @@ app.get("/messages/:conversationId", async (req, res) => {
     res.json(result.rows);
 
   } catch (err) {
-    console.log(err);
+    console.error("MESSAGES ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1126,31 +569,21 @@ app.post("/reply", async (req, res) => {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    const check = await pool.query(
-      `
-      SELECT c.id
-      FROM conversations c
-      JOIN sites s ON c.site_id = s.id
-      WHERE c.id = $1
-      AND s.site_key = $2
-      `,
-      [conversationId, site_key]
-    );
+    const allowed = await checkConversationAccess(conversationId, site_key);
 
-    if (check.rows.length === 0) {
+    if (!allowed) {
       return res.status(403).json({ error: "Unauthorized conversation" });
     }
 
     await pool.query(
-      `INSERT INTO messages (conversation_id, role, content)
-       VALUES ($1, 'human', $2)`,
+      "INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'human', $2)",
       [conversationId, message]
     );
 
     res.json({ success: true });
 
   } catch (err) {
-    console.log(err);
+    console.error("REPLY ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1163,37 +596,331 @@ app.post("/return-to-ai", async (req, res) => {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    const check = await pool.query(
-      `
-      SELECT c.id
-      FROM conversations c
-      JOIN sites s ON c.site_id = s.id
-      WHERE c.id = $1
-      AND s.site_key = $2
-      `,
-      [conversationId, site_key]
-    );
+    const allowed = await checkConversationAccess(conversationId, site_key);
 
-    if (check.rows.length === 0) {
+    if (!allowed) {
       return res.status(403).json({ error: "Unauthorized conversation" });
     }
 
     await pool.query(
-      `UPDATE conversations
-       SET human_takeover = false
-       WHERE id = $1`,
+      "UPDATE conversations SET human_takeover = false WHERE id = $1",
       [conversationId]
     );
 
     res.json({ success: true });
 
   } catch (err) {
-    console.log(err);
+    console.error("RETURN TO AI ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-const PORT = process.env.PORT;
+// WIDGET SETTINGS
+app.get("/widget-settings", async (req, res) => {
+  try {
+    const { site_key } = req.query;
+
+    if (!site_key) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT widget_title, welcome_message, primary_color, bot_instructions
+      FROM sites
+      WHERE site_key = $1
+      `,
+      [site_key]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Site not found" });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    console.error("WIDGET SETTINGS ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/widget-settings", async (req, res) => {
+  try {
+    const {
+      site_key,
+      widget_title,
+      welcome_message,
+      primary_color,
+      bot_instructions
+    } = req.body;
+
+    if (!site_key) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
+
+    await pool.query(
+      `
+      UPDATE sites
+      SET widget_title = $1,
+          welcome_message = $2,
+          primary_color = $3,
+          bot_instructions = $4
+      WHERE site_key = $5
+      `,
+      [
+        widget_title || "Kiri AI",
+        welcome_message || "Hi! How can I help you today?",
+        primary_color || "#2563eb",
+        bot_instructions || "",
+        site_key
+      ]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("SAVE WIDGET SETTINGS ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// STRIPE
+app.post("/create-checkout", async (req, res) => {
+  try {
+    const { site_key } = req.body;
+
+    if (!site_key) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      metadata: { site_key },
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          product_data: { name: "Kiri AI Pro Access" },
+          unit_amount: 1999
+        },
+        quantity: 1
+      }],
+      success_url: `${FRONTEND_URL}/success.html`,
+      cancel_url: `${FRONTEND_URL}/cancel.html`
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error("STRIPE ERROR:", err);
+    res.status(500).json({ error: "Stripe error" });
+  }
+});
+
+// ADMIN ROUTES
+app.get("/admin-overview", verifyAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        s.id,
+        s.name,
+        s.site_key,
+        s.monthly_message_count,
+        p.name AS plan_name,
+        p.monthly_limit,
+        p.price
+      FROM sites s
+      LEFT JOIN plans p ON s.plan_id = p.id
+      ORDER BY s.id DESC
+      `
+    );
+
+    const sites = result.rows;
+
+    const totalMonthlyRevenue = sites.reduce((sum, site) => {
+      return sum + Number(site.price || 0);
+    }, 0);
+
+    res.json({
+      totalSites: sites.length,
+      totalMonthlyRevenue,
+      sites
+    });
+
+  } catch (err) {
+    console.error("ADMIN OVERVIEW ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/admin-update-plan", verifyAdmin, async (req, res) => {
+  try {
+    const { siteId, newPlanName } = req.body;
+
+    const planResult = await pool.query(
+      "SELECT * FROM plans WHERE name = $1",
+      [newPlanName]
+    );
+
+    if (planResult.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+
+    await pool.query(
+      "UPDATE sites SET plan_id = $1 WHERE id = $2",
+      [planResult.rows[0].id, siteId]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("ADMIN UPDATE PLAN ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/admin/conversations", verifyAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        c.id,
+        c.created_at,
+        c.human_takeover,
+        s.name AS site_name,
+        s.site_key
+      FROM conversations c
+      JOIN sites s ON c.site_id = s.id
+      ORDER BY c.created_at DESC
+      LIMIT 100
+      `
+    );
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error("ADMIN CONVERSATIONS ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/admin/messages/:conversationId", verifyAdmin, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM messages
+      WHERE conversation_id = $1
+      ORDER BY created_at ASC
+      `,
+      [conversationId]
+    );
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error("ADMIN MESSAGES ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// KNOWLEDGE SCRAPE ADMIN
+app.post("/admin-scrape-site", verifyAdmin, async (req, res) => {
+  try {
+    const { siteId, url } = req.body;
+
+    if (!siteId || !url) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
+    const axios = require("axios");
+    const cheerio = require("cheerio");
+
+    const visited = new Set();
+    const toVisit = [url];
+    const baseDomain = new URL(url).hostname;
+
+    let allText = "";
+
+    while (toVisit.length > 0 && visited.size < 15) {
+      const currentUrl = toVisit.shift();
+
+      if (visited.has(currentUrl)) continue;
+
+      visited.add(currentUrl);
+
+      try {
+        const response = await axios.get(currentUrl, { timeout: 10000 });
+        const $ = cheerio.load(response.data);
+
+        $("p, h1, h2, h3, li").each((i, el) => {
+          const text = $(el).text().trim();
+
+          if (text.length > 30) {
+            allText += text + "\n";
+          }
+        });
+
+        $("a").each((i, el) => {
+          const link = $(el).attr("href");
+          if (!link) return;
+
+          let full;
+
+          if (link.startsWith("http")) {
+            full = link;
+          } else if (link.startsWith("/")) {
+            full = new URL(link, url).href;
+          } else {
+            return;
+          }
+
+          try {
+            const hostname = new URL(full).hostname;
+
+            if (hostname === baseDomain && !visited.has(full)) {
+              toVisit.push(full);
+            }
+          } catch {}
+        });
+
+      } catch {
+        console.log("Skipped:", currentUrl);
+      }
+    }
+
+    await pool.query(
+      "DELETE FROM knowledge_chunks WHERE site_id = $1",
+      [siteId]
+    );
+
+    const chunks = allText.match(/.{1,1200}/gs) || [];
+
+    for (const chunk of chunks) {
+      await pool.query(
+        "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
+        [siteId, chunk]
+      );
+    }
+
+    res.json({
+      success: true,
+      pages_scraped: visited.size,
+      chunks_created: chunks.length
+    });
+
+  } catch (err) {
+    console.error("SCRAPE ERROR:", err);
+    res.status(500).json({ error: "Scrape failed" });
+  }
+});
+
+// START SERVER
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Kiri backend running on port " + PORT);
