@@ -1072,14 +1072,35 @@ app.post("/widget-settings", async (req, res) => {
 
 app.get("/messages/:conversationId", async (req, res) => {
   try {
-
     const { conversationId } = req.params;
+    const { site_key } = req.query;
+
+    if (!site_key) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
+
+    const check = await pool.query(
+      `
+      SELECT c.id
+      FROM conversations c
+      JOIN sites s ON c.site_id = s.id
+      WHERE c.id = $1
+      AND s.site_key = $2
+      `,
+      [conversationId, site_key]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: "Unauthorized conversation" });
+    }
 
     const result = await pool.query(
-      `SELECT *
-       FROM messages
-       WHERE conversation_id = $1
-       ORDER BY created_at ASC`,
+      `
+      SELECT *
+      FROM messages
+      WHERE conversation_id = $1
+      ORDER BY created_at ASC
+      `,
       [conversationId]
     );
 
