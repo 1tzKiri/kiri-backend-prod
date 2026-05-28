@@ -1070,8 +1070,66 @@ app.post("/widget-settings", async (req, res) => {
   }
 });
 
+app.get("/messages/:conversationId", async (req, res) => {
+  try {
 
+    const { conversationId } = req.params;
 
+    const result = await pool.query(
+      `SELECT *
+       FROM messages
+       WHERE conversation_id = $1
+       ORDER BY created_at ASC`,
+      [conversationId]
+    );
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/reply", async (req, res) => {
+  try {
+
+    const { conversationId, message } = req.body;
+
+    await pool.query(
+      `INSERT INTO messages
+       (conversation_id, role, content)
+       VALUES ($1, 'human', $2)`,
+      [conversationId, message]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/return-to-ai", async (req, res) => {
+  try {
+
+    const { conversationId } = req.body;
+
+    await pool.query(
+      `UPDATE conversations
+       SET human_takeover = false
+       WHERE id = $1`,
+      [conversationId]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 const PORT = process.env.PORT;
 
