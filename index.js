@@ -1114,12 +1114,29 @@ app.get("/messages/:conversationId", async (req, res) => {
 
 app.post("/reply", async (req, res) => {
   try {
+    const { conversationId, message, site_key } = req.body;
 
-    const { conversationId, message } = req.body;
+    if (!conversationId || !message || !site_key) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
+    const check = await pool.query(
+      `
+      SELECT c.id
+      FROM conversations c
+      JOIN sites s ON c.site_id = s.id
+      WHERE c.id = $1
+      AND s.site_key = $2
+      `,
+      [conversationId, site_key]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: "Unauthorized conversation" });
+    }
 
     await pool.query(
-      `INSERT INTO messages
-       (conversation_id, role, content)
+      `INSERT INTO messages (conversation_id, role, content)
        VALUES ($1, 'human', $2)`,
       [conversationId, message]
     );
@@ -1134,8 +1151,26 @@ app.post("/reply", async (req, res) => {
 
 app.post("/return-to-ai", async (req, res) => {
   try {
+    const { conversationId, site_key } = req.body;
 
-    const { conversationId } = req.body;
+    if (!conversationId || !site_key) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
+    const check = await pool.query(
+      `
+      SELECT c.id
+      FROM conversations c
+      JOIN sites s ON c.site_id = s.id
+      WHERE c.id = $1
+      AND s.site_key = $2
+      `,
+      [conversationId, site_key]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: "Unauthorized conversation" });
+    }
 
     await pool.query(
       `UPDATE conversations
