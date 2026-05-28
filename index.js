@@ -316,16 +316,22 @@ const wantsHuman = humanTriggers.some(trigger =>
 );
 
 if (wantsHuman) {
-
   await pool.query(
     "UPDATE conversations SET human_takeover = true WHERE id = $1",
     [convoId]
   );
 
-  return res.json({
-    reply: "Sure — a human agent will join the conversation shortly."
-  });
+  const humanReply = "Sure — a human agent will join the conversation shortly.";
 
+  await pool.query(
+    "INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)",
+    [convoId, "assistant", humanReply]
+  );
+
+  return res.json({
+    reply: humanReply,
+    conversationId: convoId
+  });
 }
 
 const lastMessages = messagesForAI.slice(-10);
@@ -936,7 +942,7 @@ app.get("/conversations", async (req, res) => {
     }
 
     const result = await pool.query(
-      "SELECT * FROM conversations WHERE site_id = $1 ORDER BY id DESC",
+      "SELECT * FROM conversations WHERE site_id = $1 ORDER BY created_at DESC",
       [site.rows[0].id]
     );
 
