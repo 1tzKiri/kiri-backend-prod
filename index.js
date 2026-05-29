@@ -728,8 +728,8 @@ app.post("/create-checkout", async (req, res) => {
         },
         quantity: 1
       }],
-      success_url: `${FRONTEND_URL}/success.html`,
-      cancel_url: `${FRONTEND_URL}/cancel.html`
+     success_url: `${FRONTEND_URL}/app.html?payment=success`,
+cancel_url: `${FRONTEND_URL}/app.html?payment=cancelled`
     });
 
     res.json({ url: session.url });
