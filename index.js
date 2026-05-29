@@ -1,4 +1,4 @@
-global.File = class {};
+global.File = class {}; 
 
 require("dotenv").config();
 
