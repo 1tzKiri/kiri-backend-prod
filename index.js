@@ -480,12 +480,12 @@ app.post("/site-usage", async (req, res) => {
     }
 
     const site = result.rows[0];
-    const limit = site.monthly_limit || 10;
+    const limit = site.monthly_limit || 500;
     const used = site.monthly_message_count || 0;
 
     res.json({
       name: site.name,
-      plan: site.plan_name || "free",
+      site.plan_name || site.current_plan || "starter",
       monthlyUsed: used,
       monthlyLimit: limit,
       remaining: limit - used,
