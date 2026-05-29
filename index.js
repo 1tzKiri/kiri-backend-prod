@@ -37,22 +37,21 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-      const site_key = session.metadata?.site_key;
+   const site_key = session.metadata?.site_key;
+const plan = (session.metadata?.plan || "pro").toLowerCase();
 
-      if (site_key) {
-        await pool.query(
-          `
-          UPDATE sites
-          SET plan_id = (SELECT id FROM plans WHERE LOWER(name) = 'pro')
-          WHERE site_key = $1
-          `,
-          [site_key]
-        );
+if (site_key && ["starter", "pro"].includes(plan)) {
+  await pool.query(
+    `
+    UPDATE sites
+    SET plan_id = (SELECT id FROM plans WHERE LOWER(name) = $1)
+    WHERE site_key = $2
+    `,
+    [plan, site_key]
+  );
 
-        console.log("✅ Stripe payment success. Plan upgraded:", site_key);
-      }
-    }
-
+  console.log("✅ Stripe payment success. Plan upgraded:", site_key, plan);
+}
     res.json({ received: true });
   } catch (err) {
     console.log("❌ Webhook error:", err.message);
@@ -688,21 +687,41 @@ app.post("/widget-settings", async (req, res) => {
 // STRIPE
 app.post("/create-checkout", async (req, res) => {
   try {
-    const { site_key } = req.body;
+    const { site_key, plan } = req.body;
 
     if (!site_key) {
       return res.status(400).json({ error: "Missing site key" });
     }
 
+    const selectedPlan = (plan || "pro").toLowerCase();
+
+    const plans = {
+      starter: {
+        name: "Kiri AI Starter",
+        amount: 3000
+      },
+      pro: {
+        name: "Kiri AI Pro",
+        amount: 12000
+      }
+    };
+
+    if (!plans[selectedPlan]) {
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
-      metadata: { site_key },
+      metadata: {
+        site_key,
+        plan: selectedPlan
+      },
       line_items: [{
         price_data: {
           currency: "usd",
-          product_data: { name: "Kiri AI Pro Access" },
-          unit_amount: 1999
+          product_data: { name: plans[selectedPlan].name },
+          unit_amount: plans[selectedPlan].amount
         },
         quantity: 1
       }],
