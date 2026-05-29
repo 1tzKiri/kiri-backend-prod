@@ -182,15 +182,14 @@ app.post("/ask", askLimiter, async (req, res) => {
     }
 
     // rate limit by plan
-    const planName = (site.plan_name || "free").toLowerCase();
+    const planName = (site.plan_name || site.current_plan || "starter").toLowerCase();
 
-    const limits = {
-      free: 10,
-      pro: 100,
-      enterprise: 1000
-    };
+   const limits = {
+  starter: 30,
+  pro: 300
+};
 
-    const perMinuteLimit = limits[planName] || 10;
+    const perMinuteLimit = limits[planName] || 30;
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
     const rateResult = await pool.query(
