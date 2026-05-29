@@ -37,22 +37,25 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-   const site_key = session.metadata?.site_key;
-const plan = (session.metadata?.plan || "pro").toLowerCase();
+      const site_key = session.metadata?.site_key;
+      const plan = (session.metadata?.plan || "pro").toLowerCase();
 
-if (site_key && ["starter", "pro"].includes(plan)) {
-  await pool.query(
-    `
-    UPDATE sites
-    SET plan_id = (SELECT id FROM plans WHERE LOWER(name) = $1)
-    WHERE site_key = $2
-    `,
-    [plan, site_key]
-  );
+      if (site_key && ["starter", "pro"].includes(plan)) {
+        await pool.query(
+          `
+          UPDATE sites
+          SET plan_id = (SELECT id FROM plans WHERE LOWER(name) = $1)
+          WHERE site_key = $2
+          `,
+          [plan, site_key]
+        );
 
-  console.log("✅ Stripe payment success. Plan upgraded:", site_key, plan);
-}
+        console.log("✅ Stripe payment success. Plan upgraded:", site_key, plan);
+      }
+    }
+
     res.json({ received: true });
+
   } catch (err) {
     console.log("❌ Webhook error:", err.message);
     res.sendStatus(400);
