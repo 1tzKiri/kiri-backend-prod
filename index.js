@@ -44,8 +44,10 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
         await pool.query(
           `
           UPDATE sites
-          SET plan_id = (SELECT id FROM plans WHERE LOWER(name) = $1)
-          WHERE site_key = $2
+SET 
+  plan_id = (SELECT id FROM plans WHERE LOWER(name) = $1),
+  current_plan = $1
+WHERE site_key = $2
           `,
           [plan, site_key]
         );
