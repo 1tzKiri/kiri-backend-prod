@@ -1,4 +1,4 @@
-global.File = class {}; 
+global.File = class {};
 
 require("dotenv").config();
 
@@ -40,7 +40,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       const site_key = session.metadata?.site_key;
       const plan = (session.metadata?.plan || "pro").toLowerCase();
 
-      if (site_key && ["starter", "pro"].includes(plan)) {
+      if (site_key && ["", "pro"].includes(plan)) {
         await pool.query(
           `
           UPDATE sites
@@ -483,15 +483,15 @@ app.post("/site-usage", async (req, res) => {
     const limit = site.monthly_limit || 500;
     const used = site.monthly_message_count || 0;
 
-    res.json({
-      name: site.name,
-      site.plan_name || site.current_plan || "starter",
-      monthlyUsed: used,
-      monthlyLimit: limit,
-      remaining: limit - used,
-      price: site.price,
-      lastReset: site.last_reset_at
-    });
+  res.json({
+  name: site.name,
+  plan: site.plan_name || site.current_plan || "starter",
+  monthlyUsed: used,
+  monthlyLimit: limit,
+  remaining: limit - used,
+  price: site.price,
+  lastReset: site.last_reset_at
+});
 
   } catch (err) {
     console.error("SITE USAGE ERROR:", err);
