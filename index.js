@@ -722,6 +722,79 @@ app.post("/widget-settings", async (req, res) => {
   }
 });
 
+// KNOWLEDGE BASE
+
+app.post("/knowledge", async (req, res) => {
+  try {
+    const { site_key, content } = req.body;
+
+    if (!site_key || !content) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
+    const site = await getSiteByKey(site_key);
+
+    if (!site) {
+      return res.status(404).json({ error: "Site not found" });
+    }
+
+    await pool.query(
+      "DELETE FROM knowledge_chunks WHERE site_id = $1",
+      [site.id]
+    );
+
+    const chunks = content.match(/.{1,1200}/gs) || [];
+
+    for (const chunk of chunks) {
+      await pool.query(
+        "INSERT INTO knowledge_chunks (site_id, content) VALUES ($1, $2)",
+        [site.id, chunk]
+      );
+    }
+
+    res.json({
+      success: true,
+      chunks_created: chunks.length
+    });
+
+  } catch (err) {
+    console.error("KNOWLEDGE SAVE ERROR:", err);
+    res.status(500).json({ error: "Knowledge save failed" });
+  }
+});
+
+app.get("/knowledge", async (req, res) => {
+  try {
+    const { site_key } = req.query;
+
+    if (!site_key) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
+
+    const site = await getSiteByKey(site_key);
+
+    if (!site) {
+      return res.status(404).json({ error: "Site not found" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT id, content, created_at
+      FROM knowledge_chunks
+      WHERE site_id = $1
+      ORDER BY created_at DESC
+      `,
+      [site.id]
+    );
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error("KNOWLEDGE LOAD ERROR:", err);
+    res.status(500).json({ error: "Knowledge load failed" });
+  }
+});
+
 // STRIPE
 app.post("/create-checkout", async (req, res) => {
   try {
