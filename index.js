@@ -41,7 +41,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       const site_key = session.metadata?.site_key;
       const plan = (session.metadata?.plan || "pro").toLowerCase();
 
-      if (site_key && ["", "pro"].includes(plan)) {
+      if (site_key && ["starter", "pro"].includes(plan)) {
         await pool.query(
           `
           UPDATE sites
