@@ -24,6 +24,38 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 const FRONTEND_URL = "https://kiri-frontend.vercel.app";
 
+app.post("/allowed-domain", async (req, res) => {
+  try {
+    const { site_key, allowed_domain } = req.body;
+
+    if (!site_key) {
+      return res.status(400).json({ error: "Missing site key" });
+    }
+
+    const cleanDomain = (allowed_domain || "")
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .split("/")[0]
+      .trim()
+      .toLowerCase();
+
+    await pool.query(
+      `
+      UPDATE sites
+      SET allowed_domain = $1
+      WHERE site_key = $2
+      `,
+      [cleanDomain, site_key]
+    );
+
+    res.json({ success: true, allowed_domain: cleanDomain });
+
+  } catch (err) {
+    console.error("ALLOWED DOMAIN ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // STRIPE WEBHOOK MUST BE BEFORE express.json()
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
