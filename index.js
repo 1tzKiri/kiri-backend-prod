@@ -486,7 +486,7 @@ app.post("/login", async (req, res) => {
 // CLIENT DATA
 app.post("/site-usage", async (req, res) => {
   try {
-    const { siteKey } = req.body;
+    const siteKey = req.body.siteKey || req.body.site_key;
 
     if (!siteKey) {
       return res.status(400).json({ error: "Missing site key" });
